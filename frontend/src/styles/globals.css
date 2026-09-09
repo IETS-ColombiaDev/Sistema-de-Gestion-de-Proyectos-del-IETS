@@ -1,0 +1,324 @@
+/* ==========================================================================
+   HIGEP Web — estilos globales
+   Los valores replican src/styles/theme.ts (fuente de verdad de los tokens).
+   ========================================================================== */
+
+:root {
+  /* Primarios */
+  --c-purple: #6366f1;
+  --c-purple-dark: #4f46e5;
+  --c-purple-light: #818cf8;
+  --c-blue: #3b82f6;
+  --c-aquamarine: #06b6d4;
+
+  /* Texto */
+  --c-text: #0f172a;
+  --c-text-2: #64748b;
+  --c-text-3: #94a3b8;
+  --c-text-inverse: #ffffff;
+
+  /* Fondos */
+  --c-bg-app: #f8fafc;
+  --c-bg-card: #ffffff;
+  --c-bg-sidebar: #ffffff;
+  --c-bg-hover: #f1f5f9;
+  --c-bg-active: #eef2ff;
+  --c-overlay: rgba(15, 23, 42, 0.45);
+
+  /* Bordes */
+  --c-border: #e2e8f0;
+  --c-border-medium: #cbd5e1;
+  --c-border-dark: #94a3b8;
+
+  /* Estados */
+  --c-success: #10b981;
+  --c-success-soft: #d1fae5;
+  --c-warning: #f59e0b;
+  --c-warning-soft: #fef3c7;
+  --c-error: #ef4444;
+  --c-error-soft: #fee2e2;
+  --c-info: #3b82f6;
+  --c-info-soft: #dbeafe;
+
+  /* Marca */
+  --grad-brand: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+
+  /* Tipografia */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 13px;
+  --fs-base: 15px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 30px;
+
+  /* Espaciado */
+  --sp-xxs: 4px;
+  --sp-xs: 8px;
+  --sp-sm: 12px;
+  --sp-md: 16px;
+  --sp-lg: 20px;
+  --sp-xl: 24px;
+  --sp-2xl: 32px;
+  --sp-3xl: 40px;
+  --sp-4xl: 64px;
+
+  /* Radios */
+  --r-sm: 4px;
+  --r-base: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 9999px;
+
+  /* Sombras */
+  --sh-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --sh-base: 0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --sh-md: 0 4px 10px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.06);
+  --sh-lg: 0 10px 25px rgba(15, 23, 42, 0.12);
+  --sh-xl: 0 20px 40px rgba(15, 23, 42, 0.16);
+
+  /* Transiciones */
+  --t-fast: 150ms ease-in-out;
+  --t-base: 200ms ease-in-out;
+  --t-slow: 300ms ease-in-out;
+
+  /* Layout */
+  --sidebar-w: 280px;
+  --header-h: 64px;
+  --gutter: 24px;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  line-height: 1.55;
+  color: var(--c-text);
+  background: var(--c-bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--c-text);
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--c-blue);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   Foco accesible — outline 2px purple, offset 2px (guia seccion 7)
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--c-purple);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbars (guia seccion 9)
+   -------------------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: var(--r-full);
+  border: 2px solid #f1f5f9;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+.scroll-discreto::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-discreto::-webkit-scrollbar-thumb {
+  border: none;
+}
+
+/* --------------------------------------------------------------------------
+   Motion (guia seccion 8)
+   -------------------------------------------------------------------------- */
+@keyframes hg-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hg-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes hg-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes hg-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.85;
+  }
+}
+@keyframes hg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hg-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.hg-anim-in {
+  animation: hg-fade-in var(--t-slow) both;
+}
+.hg-anim-up {
+  animation: hg-slide-up var(--t-slow) both;
+}
+.hg-pulse {
+  animation: hg-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Utilidades
+   -------------------------------------------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hg-skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%);
+  background-size: 800px 100%;
+  animation: hg-shimmer 1.4s linear infinite;
+  border-radius: var(--r-base);
+}
+
+/* --------------------------------------------------------------------------
+   Impresion / PDF (guia seccion 8)
+   -------------------------------------------------------------------------- */
+@media print {
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+  }
+  .print-full {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .hg-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid var(--c-border) !important;
+  }
+  a[href]::after {
+    content: '';
+  }
+  @page {
+    margin: 14mm;
+  }
+}
