@@ -1,0 +1,100 @@
+# =============================================================================
+# HIGEP Web — Git Ignore Configuration
+# =============================================================================
+
+# Dependencias (nunca deben subirse a GitHub)
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Salidas de compilacion y distribucion
+dist/
+*/dist/
+dist-ssr/
+*/dist-ssr/
+build/
+*/build/
+out/
+.output/
+
+# Variables de entorno y secretos (ADR-04, ADR-05)
+# Solo se versiona .env.example como plantilla
+.env
+*/.env
+.env.local
+*/.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+!*.env.example
+!.env.example
+!*/.env.example
+
+# Cache de TypeScript y herramientas de build
+*.tsbuildinfo
+*/tsconfig.tsbuildinfo
+.eslintcache
+.turbo/
+
+# Archivos JavaScript compilados accidentalmente en src
+frontend/src/**/*.js
+frontend/src/**/*.js.map
+frontend/vite.config.js
+frontend/vite.config.js.map
+
+# Registros de log y depuracion
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Cobertura y reportes de pruebas
+coverage/
+*/coverage/
+.vitest/
+*/.vitest/
+
+# Configuraciones de editores y sistemas operativos
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.sublime-project
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Firebase y Cloud Emulators
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+*-service-account.json
+service-account*.json
+
+# Backups y temporales
+*.bak
+*.tmp
+*.temp
+scratch/
