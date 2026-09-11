@@ -24,6 +24,7 @@ import { Cargando, Vacio } from '@/components/EstadoVista'
 import FiltroBarra, { useFiltros, type DefinicionFiltro } from '@/components/FiltroBarra'
 import { Nota, Pista } from '@/components/Ayuda'
 import {
+  ALTO,
   BarrasDivergentes,
   BarrasHorizontales,
   Cascada,
@@ -39,7 +40,6 @@ import {
   tonoDivergente,
 } from '@/components/charts'
 import { pareto } from '@/domain/costos'
-import { esMovil, useMedia } from '@/lib/useMedia'
 import { IconCandado, IconExportar, IconPresupuesto, IconRefrescar } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
 import { formatearFecha, formatearPeriodo } from '@/domain/fechas'
@@ -51,8 +51,6 @@ type Vista = 'valor' | 'desglose' | 'equipo' | 'fuente'
 export default function Costos() {
   const { datos, resumen, analisis, cargando, recalcular } = useProyecto()
   const [vista, setVista] = useState<Vista>('valor')
-  // Pantalla estrecha: los graficos agrandan su texto y simplifican los ejes.
-  const compacto = useMedia(esMovil)
 
   const proyecto = datos?.proyecto
   const fmt = (n: number) => monedaCorta(n)
@@ -340,8 +338,7 @@ export default function Costos() {
                 puntos={curva.puntos}
                 formato={fmt}
                 presupuesto={evm.presupuestoTotal}
-                alto={320}
-                compacto={compacto}
+                alto={ALTO.lg}
               />
             </Figura>
           </Card>
@@ -375,7 +372,7 @@ export default function Costos() {
                     />
                   }
                 >
-                  <Cascada pasos={cascada} formato={fmt} compacto={compacto} />
+                  <Cascada pasos={cascada} formato={fmt} />
                 </Figura>
               )}
             </Card>
@@ -644,7 +641,7 @@ export default function Costos() {
                       },
                     ]}
                     formatoValor={fmt}
-                    alto={250}
+                    alto={ALTO.md}
                   />
                 </Figura>
               </Card>
@@ -674,7 +671,6 @@ export default function Costos() {
                         agrupado.porRubro.map((r) => ({ ...r, comprometido: 0 })),
                       ).map((l) => ({ ...l, importe: l.ejecutado }))}
                       formato={fmtExacto}
-                    compacto={compacto}
                     />
                   </Figura>
                 </Card>

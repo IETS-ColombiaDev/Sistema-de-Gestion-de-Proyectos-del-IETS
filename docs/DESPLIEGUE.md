@@ -84,7 +84,7 @@ desarrollo; en producción la ausencia de credenciales debe fallar la canalizaci
 cd frontend
 npm ci
 npm run lint          # verificación de tipos
-npm test              # 146 pruebas
+npm test              # 188 pruebas
 npm run build
 
 # 2. Funciones

@@ -30,7 +30,11 @@ export default function Card({
           {acciones && <div className="hg-fila no-print">{acciones}</div>}
         </header>
       )}
-      {children}
+      {/* Cuerpo flexible: cuando la tarjeta se estira para igualar a su vecina
+          de fila, es este contenedor el que reparte el alto sobrante al
+          grafico. Sin el, el contenido queda arriba y el resto de la tarjeta
+          es un hueco en blanco. */}
+      <div className="hg-card__cuerpo">{children}</div>
     </section>
   )
 }

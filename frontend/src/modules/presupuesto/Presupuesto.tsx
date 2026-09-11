@@ -18,7 +18,8 @@ import Modal, { ModalConfirmacion } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Field'
 import { Cargando, Vacio } from '@/components/EstadoVista'
 import { useToast } from '@/components/Toast'
-import { Figura, LineasTemporales } from '@/components/charts'
+import {
+  ALTO, Figura, LineasTemporales } from '@/components/charts'
 import { IconEditar, IconEliminar, IconMas, IconPresupuesto } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -319,7 +320,7 @@ export default function Presupuesto() {
               />
             }
           >
-            <LineasTemporales series={seriesAcumuladas} formatoValor={(v) => monedaCorta(v)} alto={240} />
+            <LineasTemporales series={seriesAcumuladas} formatoValor={(v) => monedaCorta(v)} alto={ALTO.md} />
           </Figura>
         </Card>
       )}

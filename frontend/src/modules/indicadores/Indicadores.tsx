@@ -17,7 +17,10 @@ import Tabs from '@/components/Tabs'
 import Table from '@/components/ui/Table'
 import Modal from '@/components/ui/Modal'
 import { Cargando, Vacio } from '@/components/EstadoVista'
-import { BarraMeta, Figura, LineasTemporales } from '@/components/charts'
+import { BarraMeta, Bullet, Figura, LineasTemporales } from '@/components/charts'
+import FiltroBarra, { useFiltros, type DefinicionFiltro } from '@/components/FiltroBarra'
+import KPICard from '@/components/Dashboard/KPICard'
+import { ESTADO } from '@/components/charts/paleta'
 import { IconCandado, IconExportar, IconIndicador, IconRefrescar } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
 import { definicionPorCodigo, formatearValorIndicador } from '@/domain/indicadores'
@@ -28,6 +31,7 @@ import { formatearFecha } from '@/domain/fechas'
 import { estadoColors } from '@/styles/theme'
 import {
   CATEGORIAS_INDICADOR,
+  ESTADOS_INDICADOR,
   type CategoriaIndicador,
   type DefinicionIndicador,
   type ResultadoIndicador,
@@ -61,15 +65,95 @@ export default function Indicadores() {
     void listarSnapshots(proyecto.id).then(setSnapshots)
   }, [proyecto])
 
+  const definiciones = useMemo<DefinicionFiltro[]>(
+    () => [
+      {
+        clave: 'categoria',
+        etiqueta: 'Categoria',
+        tipo: 'select',
+        placeholder: 'Todas',
+        opciones: CATEGORIAS_INDICADOR as readonly string[],
+      },
+      {
+        clave: 'estado',
+        etiqueta: 'Estado',
+        tipo: 'select',
+        placeholder: 'Todos',
+        opciones: ESTADOS_INDICADOR as readonly string[],
+        pista: 'El semaforo se calcula contra la meta y el sentido de cada indicador; no se fija a mano.',
+      },
+      {
+        clave: 'cumplimiento',
+        etiqueta: 'Cumplimiento',
+        tipo: 'select',
+        placeholder: 'Todos',
+        opciones: [
+          { valor: 'incumple', etiqueta: 'Solo los que no cumplen' },
+          { valor: 'cumple', etiqueta: 'Solo los que cumplen' },
+        ],
+      },
+    ],
+    [],
+  )
+  const { valores, set, limpiar, activos } = useFiltros(definiciones, 'in')
+
+  /**
+   * Cumplimiento: que fraccion de la meta se ha alcanzado, en el sentido que
+   * corresponda a cada indicador. 100 % es cumplirla exactamente.
+   *
+   * Sirve para ORDENAR y para filtrar, no para graficar en una escala comun.
+   * Llevarlo a una barra comparativa fue un error que el propio dato dejo a la
+   * vista: en un indicador de "menor es mejor" el cociente se dispara cuando el
+   * valor se acerca a cero —la desviacion presupuestal, con 0,4 % frente a una
+   * meta de 5 %, daba +1090 puntos— y ese unico valor aplastaba la escala de
+   * todos los demas. Indicadores con unidad y sentido distintos no comparten
+   * escala; cada uno se muestra contra SU meta, mas abajo, en su propia barra.
+   */
+  const conMeta = useMemo(
+    () =>
+      indicadores
+        .map((r) => ({ res: r, def: definicionPorCodigo(r.codigo, catalogoIndicadores) }))
+        .filter((x): x is { res: ResultadoIndicador; def: DefinicionIndicador } => Boolean(x.def))
+        .map((x) => {
+          if (x.res.valor == null || x.def.meta === 0) return { ...x, cumplimiento: null }
+          const cumplimiento =
+            x.def.sentido === 'Menor es mejor'
+              ? (x.def.meta / Math.max(x.res.valor, 0.0001)) * 100
+              : (x.res.valor / x.def.meta) * 100
+          return { ...x, cumplimiento }
+        }),
+    [indicadores, catalogoIndicadores],
+  )
+
+  const filtrados = useMemo(
+    () =>
+      conMeta.filter((x) => {
+        if (valores.categoria && x.def.categoria !== valores.categoria) return false
+        if (valores.estado && x.res.estado !== valores.estado) return false
+        if (valores.cumplimiento === 'incumple' && !(x.cumplimiento != null && x.cumplimiento < 100))
+          return false
+        if (valores.cumplimiento === 'cumple' && !(x.cumplimiento != null && x.cumplimiento >= 100))
+          return false
+        return true
+      }),
+    [conMeta, valores.categoria, valores.estado, valores.cumplimiento],
+  )
+
+  /** Lo que mas lejos esta de su meta, primero. */
+  const ordenadosPorBrecha = useMemo(
+    () =>
+      [...filtrados]
+        .filter((x) => x.cumplimiento != null)
+        .sort((a, b) => (a.cumplimiento as number) - (b.cumplimiento as number)),
+    [filtrados],
+  )
+
   const porCategoria = useMemo(() => {
     return CATEGORIAS_INDICADOR.map((cat) => ({
       categoria: cat as CategoriaIndicador,
-      items: indicadores
-        .map((r) => ({ res: r, def: definicionPorCodigo(r.codigo, catalogoIndicadores) }))
-        .filter((x): x is { res: ResultadoIndicador; def: DefinicionIndicador } => Boolean(x.def))
-        .filter((x) => x.def.categoria === cat),
+      items: filtrados.filter((x) => x.def.categoria === cat),
     })).filter((g) => g.items.length > 0)
-  }, [indicadores, catalogoIndicadores])
+  }, [filtrados])
 
   if (cargando || !datos || !proyecto) return <Cargando />
 
@@ -128,6 +212,130 @@ export default function Indicadores() {
             .join(' · ')}
         />
       )}
+
+      <div className="hg-grid hg-grid--kpi">
+        <KPICard
+          etiqueta="Cumplen la meta"
+          valor={`${conMeta.filter((x) => x.cumplimiento != null && x.cumplimiento >= 100).length}`}
+          pie={`de ${conDatos.length} con datos suficientes`}
+          acento={ESTADO.bueno}
+          pista="Indicadores cuyo resultado alcanza o supera su meta, leida en el sentido que corresponda a cada uno."
+        />
+        <KPICard
+          etiqueta="Por debajo de la meta"
+          valor={`${conMeta.filter((x) => x.cumplimiento != null && x.cumplimiento < 100).length}`}
+          pie="Requieren revision del dato fuente"
+          acento={ESTADO.advertencia}
+          pista="No alcanzan la meta. La correccion se hace sobre el dato de origen en su modulo, nunca sobre el resultado."
+        />
+        <KPICard
+          etiqueta="Criticos"
+          valor={`${criticos.length}`}
+          color={criticos.length > 0 ? ESTADO.critico : undefined}
+          acento={criticos.length > 0 ? ESTADO.critico : undefined}
+          pie="Fuera de la banda de tolerancia"
+          pista="El semaforo compara el resultado con la meta y con los umbrales del catalogo de parametros."
+        />
+        <KPICard
+          etiqueta="Sin datos"
+          valor={`${sinDatos.length}`}
+          pie="Faltan insumos para calcularlos"
+          acento="#94A3B8"
+          pista="Sin los insumos necesarios el indicador se declara sin datos; nunca se muestra como cero, porque cero es un resultado y la ausencia de dato no lo es."
+        />
+      </div>
+
+      <FiltroBarra
+        definiciones={definiciones}
+        valores={valores}
+        onCambio={set}
+        onLimpiar={limpiar}
+        activos={activos}
+        resumen={`${filtrados.length} de ${conMeta.length} indicador(es)`}
+      />
+
+      <Card
+        titulo="Cada indicador contra su meta"
+        subtitulo="Ordenados por lo que les falta para cumplir. Cada barra usa la escala de su propio indicador: una unidad no se compara con otra."
+      >
+        {ordenadosPorBrecha.length === 0 ? (
+          <Vacio
+            titulo="Sin indicadores con meta comparable"
+            texto="Ninguno de los indicadores seleccionados tiene resultado y meta con los que medir la brecha."
+          />
+        ) : (
+          <Figura
+            tabla={
+              <Table
+                columnas={[
+                  {
+                    clave: 'codigo',
+                    titulo: 'Codigo',
+                    render: (x: (typeof ordenadosPorBrecha)[number]) => (
+                      <span className="hg-t-mono">{x.def.codigo}</span>
+                    ),
+                  },
+                  { clave: 'nombre', titulo: 'Indicador', render: (x) => x.def.nombre },
+                  {
+                    clave: 'resultado',
+                    titulo: 'Resultado',
+                    alineacion: 'derecha',
+                    render: (x) => formatearValorIndicador(x.res.valor, x.def.unidad),
+                  },
+                  {
+                    clave: 'meta',
+                    titulo: 'Meta',
+                    alineacion: 'derecha',
+                    render: (x) => `${x.def.meta}${x.def.unidad === 'porcentaje' ? ' %' : ''}`,
+                  },
+                  {
+                    clave: 'cumplimiento',
+                    titulo: 'Cumplimiento',
+                    alineacion: 'derecha',
+                    render: (x) => `${(x.cumplimiento as number).toFixed(0)} %`,
+                  },
+                ]}
+                filas={ordenadosPorBrecha}
+                claveDe={(x) => x.def.codigo}
+              />
+            }
+          >
+            <div className="hg-pila" style={{ gap: 'var(--sp-sm)' }}>
+              {ordenadosPorBrecha.map((x) => {
+                const c = estadoColors.indicador[x.res.estado]
+                const cumple = (x.cumplimiento as number) >= 100
+                return (
+                  <div key={x.def.codigo} className="hg-medidor">
+                    <div className="hg-medidor__rotulo">
+                      <span className="hg-t-mono hg-t-xs hg-t-ter">{x.def.codigo}</span>
+                      <span className="hg-t-sm">{x.def.nombre}</span>
+                    </div>
+                    <div className="hg-medidor__barra">
+                      <Bullet
+                        valor={x.res.valor}
+                        meta={x.def.meta}
+                        color={c.fg}
+                        sentido={x.def.sentido === 'Menor es mejor' ? 'menorEsMejor' : 'mayorEsMejor'}
+                        formato={(n) => formatearValorIndicador(n, x.def.unidad)}
+                      />
+                    </div>
+                    <span
+                      className="hg-t-sm hg-t-num hg-t-bold hg-medidor__cifra"
+                      style={{ color: cumple ? undefined : c.fg }}
+                    >
+                      {formatearValorIndicador(x.res.valor, x.def.unidad)}
+                    </span>
+                    <span className="hg-t-xs hg-t-sec hg-medidor__meta">
+                      meta {x.def.meta}
+                      {x.def.unidad === 'porcentaje' ? ' %' : ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </Figura>
+        )}
+      </Card>
 
       <Card
         titulo="Indicadores institucionales"

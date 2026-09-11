@@ -25,39 +25,128 @@ import { Cargando, ErrorVista, Vacio } from '@/components/EstadoVista'
 import FiltroBarra, { useFiltros, type DefinicionFiltro } from '@/components/FiltroBarra'
 import { Pista } from '@/components/Ayuda'
 import {
+  ALTO,
+  BarrasAgrupadas,
   BarrasDivergentes,
   Cuadrante,
   CurvaS,
   DIVERGENTE,
+  Dona,
   ESTADO,
   Figura,
   Pareto,
   SERIE_EVM,
   Sparkline,
+  colorSerie,
   tonoDivergente,
 } from '@/components/charts'
 import { pareto } from '@/domain/costos'
-import { esMovil, useMedia } from '@/lib/useMedia'
 import { periodosEntre } from '@/domain/costos'
 import { IconExportar, IconFicha, IconMas } from '@/components/icons'
 import { usePortafolio, type FilaPortafolio } from '@/app/usePortafolio'
 import { formatearFecha } from '@/domain/fechas'
-import { conSigno, moneda, monedaCorta, porcentaje } from '@/lib/formato'
+import { iniciales, conSigno, moneda, monedaCorta, porcentaje } from '@/lib/formato'
 import { exportarExcel } from '@/lib/exportar'
 import { useAuth } from '@/auth/AuthContext'
 import { puede } from '@/auth/permisos'
 import { ESTADOS_PROYECTO } from '@/domain/types'
 
-type Vista = 'desempeno' | 'consolidado' | 'listado'
+type Vista = 'desempeno' | 'consolidado' | 'personas' | 'listado'
 
 export default function Portafolio() {
   const { filas, totales, cargando, error, recargar } = usePortafolio()
   const { usuario } = useAuth()
   const navegar = useNavigate()
   const [vista, setVista] = useState<Vista>('desempeno')
-  // Pantalla estrecha: los graficos agrandan su texto y simplifican los ejes.
-  const compacto = useMedia(esMovil)
   const [orden, setOrden] = useState<{ clave: string; dir: 'asc' | 'desc' } | null>(null)
+
+  /**
+   * Las personas del portafolio, consolidadas entre proyectos.
+   *
+   * En la ficha de un proyecto se ve su equipo; lo que no se ve en ninguna
+   * parte es que la misma persona esta en tres proyectos a la vez. Esa es la
+   * pregunta de portafolio, y es la que produce los cuellos de botella: un
+   * equipo puede verse holgado proyecto por proyecto y estar saturado al
+   * sumarlo.
+   *
+   * La identidad se resuelve por usuario institucional cuando existe, y por
+   * nombre normalizado cuando no. Se declara asi porque un homonimo se
+   * fusionaria: la vinculacion por usuario es la que da certeza, y por eso el
+   * modelo la pide (HG-051).
+   */
+  const personas = useMemo(() => {
+    const mapa = new Map<
+      string,
+      {
+        clave: string
+        nombre: string
+        perfiles: Set<string>
+        porUsuario: boolean
+        proyectos: { id: string; codigo: string; nombre: string; actividades: number; retrasadas: number }[]
+        dedicacion: number
+        actividades: number
+        retrasadas: number
+        porDesignar: boolean
+      }
+    >()
+
+    for (const f of filas) {
+      for (const m of f.datos.equipo) {
+        if (m.eliminado) continue
+        const nombre = m.porDesignar ? `${m.perfil} — por designar` : m.nombre || m.perfil
+        const clave = m.usuarioUid ?? `n:${nombre.trim().toLowerCase()}`
+        const suyas = f.resumen.actividades.filter(
+          (a) => !a.vacia && (a.responsableId === m.id || a.responsableNombre === (m.nombre || m.perfil)),
+        )
+        const retrasadas = suyas.filter((a) => a.estado === 'Retrasada').length
+        const previo = mapa.get(clave)
+        const entrada = previo ?? {
+          clave,
+          nombre,
+          perfiles: new Set<string>(),
+          porUsuario: Boolean(m.usuarioUid),
+          proyectos: [],
+          dedicacion: 0,
+          actividades: 0,
+          retrasadas: 0,
+          porDesignar: m.porDesignar,
+        }
+        entrada.perfiles.add(m.perfil)
+        entrada.dedicacion += m.dedicacionHorasMes
+        entrada.actividades += suyas.length
+        entrada.retrasadas += retrasadas
+        entrada.proyectos.push({
+          id: f.proyecto.id,
+          codigo: f.proyecto.codigo,
+          nombre: f.proyecto.nombre,
+          actividades: suyas.length,
+          retrasadas,
+        })
+        mapa.set(clave, entrada)
+      }
+    }
+
+    return [...mapa.values()]
+      .map((e) => ({ ...e, perfilesTexto: [...e.perfiles].join(' · ') }))
+      .sort(
+        (a, b) =>
+          b.proyectos.length - a.proyectos.length ||
+          b.dedicacion - a.dedicacion ||
+          a.nombre.localeCompare(b.nombre),
+      )
+  }, [filas])
+
+  /**
+   * Dedicacion de referencia de una jornada completa, en horas al mes.
+   *
+   * Sirve para senalar a quien queda comprometido por encima de una jornada al
+   * sumar sus proyectos. Es un punto de referencia para leer la tabla, no una
+   * regla de negocio: la jornada real la fija la vinculacion de cada quien.
+   */
+  const JORNADA_MES = 160
+
+  const multiproyecto = personas.filter((p) => p.proyectos.length > 1)
+  const sobrecomprometidas = personas.filter((p) => p.dedicacion > JORNADA_MES)
 
   const fmt = (n: number) => monedaCorta(n)
   const fmtExacto = (n: number) => moneda(n)
@@ -238,6 +327,29 @@ export default function Portafolio() {
           detalle: `${f.proyecto.nombre}: presupuesto ${fmt(f.analisis.evm.presupuestoTotal)}, proyeccion ${fmt(f.analisis.evm.proyeccionCierre ?? 0)}.`,
         }))
         .sort((a, b) => a.valor - b.valor),
+    [visibles],
+  )
+
+  /** Reparto del presupuesto institucional por financiador. */
+  const porFinanciador = useMemo(() => {
+    const mapa = new Map<string, number>()
+    for (const f of visibles) {
+      const clave = f.proyecto.financiador || '(sin financiador)'
+      mapa.set(clave, (mapa.get(clave) ?? 0) + f.analisis.evm.presupuestoTotal)
+    }
+    return [...mapa.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([etiqueta, valor], i) => ({ etiqueta, valor, color: colorSerie(i) }))
+  }, [visibles])
+
+  /** Reparto por estado del ciclo de vida. */
+  const porEstado = useMemo(
+    () =>
+      ESTADOS_PROYECTO.map((estado, i) => ({
+        etiqueta: estado,
+        valor: visibles.filter((f) => f.proyecto.estado === estado).length,
+        color: colorSerie(i),
+      })),
     [visibles],
   )
 
@@ -572,6 +684,7 @@ export default function Portafolio() {
         opciones={[
           { valor: 'desempeno', etiqueta: 'Desempeno' },
           { valor: 'consolidado', etiqueta: 'Consolidado' },
+          { valor: 'personas', etiqueta: 'Personas', conteo: personas.length },
           { valor: 'listado', etiqueta: 'Listado', conteo: visibles.length },
         ]}
         activa={vista}
@@ -616,7 +729,7 @@ export default function Portafolio() {
                 <Cuadrante
                   puntos={puntosCuadrante}
                   onPunto={(id) => navegar(`/proyectos/${id}/dashboard`)}
-                  compacto={compacto}
+                  alto={ALTO.lg}
                 />
               </Figura>
             )}
@@ -657,6 +770,124 @@ export default function Portafolio() {
             </Card>
 
             <Card
+              titulo="Presupuesto por financiador"
+              subtitulo="De donde viene el dinero comprometido en el portafolio."
+            >
+              {porFinanciador.length === 0 ? (
+                <Vacio titulo="Sin proyectos" texto="Ajuste los filtros." />
+              ) : (
+                <Figura
+                  tabla={
+                    <Table
+                      columnas={[
+                        {
+                          clave: 'etiqueta',
+                          titulo: 'Financiador',
+                          render: (r: (typeof porFinanciador)[number]) => r.etiqueta,
+                        },
+                        {
+                          clave: 'valor',
+                          titulo: 'Presupuesto',
+                          alineacion: 'derecha',
+                          render: (r) => fmtExacto(r.valor),
+                        },
+                      ]}
+                      filas={porFinanciador}
+                      claveDe={(r) => r.etiqueta}
+                    />
+                  }
+                >
+                  <Dona porciones={porFinanciador} formato={fmt} etiquetaCentro="presupuesto" />
+                </Figura>
+              )}
+            </Card>
+
+            <Card
+              titulo="Estado del ciclo de vida"
+              subtitulo="Cuantos proyectos hay en cada etapa."
+            >
+              <Figura
+                tabla={
+                  <Table
+                    columnas={[
+                      { clave: 'etiqueta', titulo: 'Estado', render: (r: (typeof porEstado)[number]) => r.etiqueta },
+                      { clave: 'valor', titulo: 'Proyectos', alineacion: 'derecha', render: (r) => r.valor },
+                    ]}
+                    filas={porEstado}
+                    claveDe={(r) => r.etiqueta}
+                  />
+                }
+              >
+                <Dona porciones={porEstado} etiquetaCentro="proyectos" />
+              </Figura>
+            </Card>
+          </div>
+
+          <Card
+            titulo="Presupuesto aprobado frente a costo real"
+            subtitulo="Proyecto por proyecto, sobre la misma linea base."
+          >
+            {visibles.length === 0 ? (
+              <Vacio titulo="Sin proyectos que comparar" texto="Ajuste los filtros." />
+            ) : (
+              <Figura
+                leyenda={[
+                  { etiqueta: 'Presupuesto aprobado', color: SERIE_EVM.planeado },
+                  { etiqueta: 'Valor ganado', color: SERIE_EVM.ganado },
+                  { etiqueta: 'Costo real', color: SERIE_EVM.real },
+                ]}
+                tabla={
+                  <Table
+                    anchoMinimo="720px"
+                    columnas={[
+                      { clave: 'codigo', titulo: 'Proyecto', render: (f: FilaPortafolio) => f.proyecto.codigo },
+                      {
+                        clave: 'presupuesto',
+                        titulo: 'Presupuesto',
+                        alineacion: 'derecha',
+                        render: (f) => fmtExacto(f.analisis.evm.presupuestoTotal),
+                      },
+                      {
+                        clave: 'ganado',
+                        titulo: 'Valor ganado',
+                        alineacion: 'derecha',
+                        render: (f) => fmtExacto(f.analisis.evm.valorGanado),
+                      },
+                      {
+                        clave: 'real',
+                        titulo: 'Costo real',
+                        alineacion: 'derecha',
+                        render: (f) => fmtExacto(f.analisis.evm.costoReal),
+                      },
+                    ]}
+                    filas={visibles}
+                    claveDe={(f) => f.proyecto.id}
+                  />
+                }
+              >
+                <BarrasAgrupadas
+                  grupos={visibles.map((f) => ({
+                    etiqueta: f.proyecto.codigo,
+                    valores: [
+                      f.analisis.evm.presupuestoTotal,
+                      f.analisis.evm.valorGanado,
+                      f.analisis.evm.costoReal,
+                    ],
+                    detalle: f.proyecto.nombre,
+                  }))}
+                  series={[
+                    { nombre: 'Presupuesto aprobado', color: SERIE_EVM.planeado },
+                    { nombre: 'Valor ganado', color: SERIE_EVM.ganado },
+                    { nombre: 'Costo real', color: SERIE_EVM.real },
+                  ]}
+                  formato={fmt}
+                />
+              </Figura>
+            )}
+          </Card>
+
+          <div className="hg-grid hg-grid--2">
+            <Card
               titulo="Concentracion del gasto"
               subtitulo="Que proyectos explican la mayor parte del dinero ya ejecutado."
             >
@@ -696,7 +927,6 @@ export default function Portafolio() {
                   <Pareto
                     lineas={concentracion.map((l) => ({ ...l, importe: l.ejecutado }))}
                     formato={fmtExacto}
-                    compacto={compacto}
                   />
                 </Figura>
               )}
@@ -753,8 +983,7 @@ export default function Portafolio() {
                   puntos={curvaConsolidada}
                   formato={fmt}
                   presupuesto={totales.presupuestoTotal}
-                  alto={320}
-                  compacto={compacto}
+                  alto={ALTO.lg}
                 />
               </Figura>
             )}
@@ -867,6 +1096,151 @@ export default function Portafolio() {
           </p>
         </Card>
       )}
+
+      {/* ================================================================ */}
+      {/* Personas: quien esta en que proyectos                            */}
+      {/* ================================================================ */}
+      {vista === 'personas' && (
+        <div className="hg-pila">
+          <div className="hg-grid hg-grid--kpi">
+            <KPICard
+              etiqueta="Personas en el portafolio"
+              valor={`${personas.length}`}
+              pie={`${personas.filter((p) => p.porUsuario).length} vinculadas a usuario institucional`}
+              acento={colorSerie(0)}
+              pista="Una persona que figura en varios proyectos se cuenta una sola vez. La identidad se resuelve por usuario institucional; cuando no lo hay, por nombre."
+            />
+            <KPICard
+              etiqueta="En mas de un proyecto"
+              valor={`${multiproyecto.length}`}
+              pie="Su tiempo se reparte entre varios frentes"
+              acento={colorSerie(1)}
+              pista="Proyecto por proyecto cada equipo puede verse holgado; el cuello de botella aparece al sumar."
+            />
+            <KPICard
+              etiqueta={`Sobre ${JORNADA_MES} h/mes`}
+              valor={`${sobrecomprometidas.length}`}
+              color={sobrecomprometidas.length > 0 ? ESTADO.advertencia : ESTADO.bueno}
+              acento={ESTADO.advertencia}
+              pie="Dedicacion sumada por encima de una jornada"
+              pista="Suma de la dedicacion declarada en todos sus proyectos. Es una referencia de lectura, no una regla: la jornada real la fija cada vinculacion."
+            />
+            <KPICard
+              etiqueta="Perfiles por designar"
+              valor={`${personas.filter((p) => p.porDesignar).length}`}
+              color={personas.filter((p) => p.porDesignar).length > 0 ? ESTADO.advertencia : ESTADO.bueno}
+              acento={ESTADO.advertencia}
+              pie="Capacidad planeada que aun no existe"
+            />
+          </div>
+
+          <Card
+            titulo="Quien esta en que proyectos"
+            subtitulo="Una fila por persona, con los proyectos en los que participa y el trabajo que lleva en cada uno."
+          >
+            {personas.length === 0 ? (
+              <Vacio
+                titulo="Sin equipos registrados"
+                texto="Ningun proyecto visible tiene grupo desarrollador registrado."
+              />
+            ) : (
+              <Table
+                anchoMinimo="900px"
+                columnas={[
+                  {
+                    clave: 'nombre',
+                    titulo: 'Persona',
+                    render: (p: (typeof personas)[number]) => (
+                      <div className="hg-fila" style={{ gap: 'var(--sp-xs)' }}>
+                        <span className="hg-avatar hg-avatar--sm" aria-hidden="true">
+                          {p.porDesignar ? '?' : iniciales(p.nombre)}
+                        </span>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="hg-t-sm">{p.nombre}</div>
+                          <div className="hg-t-xs hg-t-ter">{p.perfilesTexto}</div>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    clave: 'proyectos',
+                    titulo: 'Proyectos',
+                    render: (p) => (
+                      <div className="hg-fila" style={{ gap: 4, flexWrap: 'wrap' }}>
+                        {p.proyectos.map((pr) => (
+                          <Link
+                            key={pr.id}
+                            to={`/proyectos/${pr.id}/dashboard`}
+                            className="hg-etiqueta-enlace"
+                            title={`${pr.nombre} · ${pr.actividades} actividad(es)${
+                              pr.retrasadas > 0 ? ` · ${pr.retrasadas} retrasada(s)` : ''
+                            }`}
+                          >
+                            {pr.codigo}
+                            {pr.retrasadas > 0 && <span className="hg-etiqueta-enlace__aviso" aria-hidden="true" />}
+                          </Link>
+                        ))}
+                      </div>
+                    ),
+                  },
+                  {
+                    clave: 'numProyectos',
+                    titulo: 'En',
+                    alineacion: 'derecha',
+                    ordenable: true,
+                    valorOrden: (p) => p.proyectos.length,
+                    render: (p) => `${p.proyectos.length}`,
+                  },
+                  {
+                    clave: 'dedicacion',
+                    titulo: 'Dedicacion',
+                    alineacion: 'derecha',
+                    ordenable: true,
+                    valorOrden: (p) => p.dedicacion,
+                    render: (p) => (
+                      <span
+                        className="hg-t-num"
+                        style={p.dedicacion > JORNADA_MES ? { color: ESTADO.advertencia, fontWeight: 700 } : undefined}
+                      >
+                        {p.dedicacion} h/mes
+                      </span>
+                    ),
+                  },
+                  {
+                    clave: 'actividades',
+                    titulo: 'Actividades',
+                    alineacion: 'derecha',
+                    ordenable: true,
+                    valorOrden: (p) => p.actividades,
+                    render: (p) => p.actividades,
+                  },
+                  {
+                    clave: 'retrasadas',
+                    titulo: 'Retrasadas',
+                    alineacion: 'derecha',
+                    render: (p) =>
+                      p.retrasadas > 0 ? (
+                        <strong className="hg-t-num" style={{ color: ESTADO.critico }}>
+                          {p.retrasadas}
+                        </strong>
+                      ) : (
+                        <span className="hg-t-ter">—</span>
+                      ),
+                  },
+                ]}
+                filas={personas}
+                claveDe={(p) => p.clave}
+              />
+            )}
+            <p className="hg-t-xs hg-t-sec" style={{ marginTop: 'var(--sp-sm)' }}>
+              La dedicacion es la <strong>declarada</strong> en cada ficha de equipo, no la ejecutada: el
+              sistema no registra horas trabajadas. Sirve para ver compromiso planeado, que es la decision
+              de asignacion; no para liquidar tiempo.
+            </p>
+          </Card>
+        </div>
+      )}
+
     </div>
   )
 }

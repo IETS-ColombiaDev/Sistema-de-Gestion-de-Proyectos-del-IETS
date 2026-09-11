@@ -18,6 +18,10 @@ import type {
   PuntoCurvaS,
 } from './avanzados'
 import { IconTablero } from '../icons'
+import { fuente, useLienzo } from '../../lib/useLienzo'
+
+/** Alturas de grafico del sistema; los modulos las piden por token. */
+export { ALTO } from '../../lib/useLienzo'
 
 // ---------------------------------------------------------------------------
 // Envoltura comun: titulo, leyenda, alternancia grafico/tabla
@@ -336,7 +340,7 @@ export interface SerieTemporal {
 export function LineasTemporales({
   series,
   sufijo = '',
-  alto = 220,
+  alto,
   formatoValor,
 }: {
   series: SerieTemporal[]
@@ -345,6 +349,7 @@ export function LineasTemporales({
   formatoValor?: (v: number) => string
 }) {
   const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null)
+  const { ref, W, H, listo, estilo, estiloSvg } = useLienzo(alto)
 
   const etiquetasX = useMemo(() => {
     const set: string[] = []
@@ -360,8 +365,6 @@ export function LineasTemporales({
   const maxY = Math.max(...valores)
   const minY = Math.min(0, ...valores)
   const rango = maxY - minY || 1
-  const W = 700
-  const H = alto
   const M = { top: 12, right: 16, bottom: 26, left: 46 }
   const anchoUtil = W - M.left - M.right
   const altoUtil = H - M.top - M.bottom
@@ -374,10 +377,13 @@ export function LineasTemporales({
   const fmt = formatoValor ?? ((v: number) => `${v.toFixed(v % 1 === 0 ? 0 : 1)}${sufijo}`)
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div ref={ref} style={estilo}>
+      {listo && (
       <svg
+        width={W}
+        height={H}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+        style={estiloSvg}
         role="img"
         aria-label={`Serie temporal de ${series.map((s) => s.nombre).join(', ')}`}
         onMouseLeave={() => setHover(null)}
@@ -386,7 +392,7 @@ export function LineasTemporales({
         {marcasY.map((v, i) => (
           <g key={i}>
             <line x1={M.left} x2={W - M.right} y1={py(v)} y2={py(v)} stroke={TINTA.rejilla} strokeWidth={1} />
-            <text x={M.left - 8} y={py(v) + 4} textAnchor="end" fontSize={10} fill={TINTA.tenue}>
+            <text x={M.left - 8} y={py(v) + 4} textAnchor="end" fontSize={fuente(11)} fill={TINTA.tenue}>
               {fmt(v)}
             </text>
           </g>
@@ -397,7 +403,7 @@ export function LineasTemporales({
           const paso = Math.ceil(etiquetasX.length / 8)
           if (i % paso !== 0 && i !== etiquetasX.length - 1) return null
           return (
-            <text key={x} x={px(i)} y={H - 8} textAnchor="middle" fontSize={10} fill={TINTA.tenue}>
+            <text key={x} x={px(i)} y={H - 8} textAnchor="middle" fontSize={fuente(11)} fill={TINTA.tenue}>
               {x}
             </text>
           )
@@ -475,6 +481,7 @@ export function LineasTemporales({
           />
         ))}
       </svg>
+      )}
 
       {hover && (
         <Tooltip x={hover.x} y={hover.y}>
@@ -644,6 +651,16 @@ export {
   Pareto,
   Sparkline,
 } from './avanzados'
+
+export { BarrasAgrupadas, CargaPersonas, Dona, LineaHitos, MatrizAsignacion } from './reparto'
+export type {
+  CargaPersona,
+  CeldaAsignacion,
+  FilaAsignacion,
+  GrupoBarras,
+  HitoLinea,
+  PorcionDona,
+} from './reparto'
 export type {
   BarraDivergente,
   LineaParetoVista,

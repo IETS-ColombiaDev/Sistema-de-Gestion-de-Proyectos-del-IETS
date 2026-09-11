@@ -49,7 +49,7 @@ export const USUARIOS_DEMO: Usuario[] = [
   {
     uid: 'u-admin',
     correo: 'admin.sistema@iets.org.co',
-    nombre: 'Administradora del sistema',
+    nombre: 'Laura Cifuentes',
     rolGlobal: 'administrador',
     activo: true,
     creadoEn: AHORA,
@@ -57,7 +57,7 @@ export const USUARIOS_DEMO: Usuario[] = [
   {
     uid: 'u-lider',
     correo: 'lider.proyecto@iets.org.co',
-    nombre: 'Lider de proyecto',
+    nombre: 'Marcela Ortiz',
     rolGlobal: 'lider',
     activo: true,
     creadoEn: AHORA,
@@ -65,7 +65,7 @@ export const USUARIOS_DEMO: Usuario[] = [
   {
     uid: 'u-gestor',
     correo: 'gestor.proyecto@iets.org.co',
-    nombre: 'Gestora de proyecto',
+    nombre: 'Daniel Pineda',
     rolGlobal: 'gestor',
     activo: true,
     creadoEn: AHORA,
@@ -73,7 +73,7 @@ export const USUARIOS_DEMO: Usuario[] = [
   {
     uid: 'u-miembro',
     correo: 'analista.uno@iets.org.co',
-    nombre: 'Analista de evaluacion',
+    nombre: 'Juliana Bermudez',
     rolGlobal: 'miembro',
     activo: true,
     creadoEn: AHORA,
@@ -81,7 +81,7 @@ export const USUARIOS_DEMO: Usuario[] = [
   {
     uid: 'u-directivo',
     correo: 'direccion.general@iets.org.co',
-    nombre: 'Direccion general',
+    nombre: 'Ricardo Nieto',
     rolGlobal: 'directivo',
     activo: true,
     creadoEn: AHORA,
@@ -89,7 +89,7 @@ export const USUARIOS_DEMO: Usuario[] = [
   {
     uid: 'u-auditor',
     correo: 'control.interno@iets.org.co',
-    nombre: 'Control interno',
+    nombre: 'Patricia Amaya',
     rolGlobal: 'auditor',
     activo: true,
     creadoEn: AHORA,
@@ -128,10 +128,10 @@ interface PlantillaActividad {
 const PLANTILLA: PlantillaActividad[] = [
   { fase: 1, nombre: 'Conformacion del grupo desarrollador', responsable: 'Lider de proyecto', offsetInicio: 0, duracion: 10, avance: 100 },
   { fase: 1, nombre: 'Elaboracion del plan de trabajo', responsable: 'Lider de proyecto', offsetInicio: 5, duracion: 12, avance: 100, entregable: 'Plan de trabajo aprobado', predecesoras: [0] },
-  { fase: 1, nombre: 'Declaracion y analisis de conflictos de interes', responsable: 'Gestora de proyecto', offsetInicio: 8, duracion: 8, avance: 100, predecesoras: [0] },
+  { fase: 1, nombre: 'Declaracion y analisis de conflictos de interes', responsable: 'Gestor de proyecto', offsetInicio: 8, duracion: 8, avance: 100, predecesoras: [0] },
   { fase: 2, nombre: 'Definicion de la pregunta de evaluacion', responsable: 'Analista de evaluacion', offsetInicio: 16, duracion: 12, avance: 100, entregable: 'Protocolo preliminar', predecesoras: [1] },
-  { fase: 2, nombre: 'Elaboracion del protocolo de evaluacion', responsable: 'Analista de evaluacion', apoyo: ['Gestora de proyecto'], offsetInicio: 26, duracion: 18, avance: 100, entregable: 'Protocolo de evaluacion', predecesoras: [3] },
-  { fase: 2, nombre: 'Socializacion del protocolo con partes interesadas', responsable: 'Gestora de proyecto', offsetInicio: 44, duracion: 10, avance: 100, predecesoras: [4] },
+  { fase: 2, nombre: 'Elaboracion del protocolo de evaluacion', responsable: 'Analista de evaluacion', apoyo: ['Gestor de proyecto'], offsetInicio: 26, duracion: 18, avance: 100, entregable: 'Protocolo de evaluacion', predecesoras: [3] },
+  { fase: 2, nombre: 'Socializacion del protocolo con partes interesadas', responsable: 'Gestor de proyecto', offsetInicio: 44, duracion: 10, avance: 100, predecesoras: [4] },
   { fase: 3, nombre: 'Diseno de estrategias de busqueda', responsable: 'Especialista en informacion', offsetInicio: 52, duracion: 10, avance: 100, predecesoras: [4] },
   { fase: 3, nombre: 'Busqueda en bases de datos bibliograficas', responsable: 'Especialista en informacion', offsetInicio: 60, duracion: 14, avance: 100, predecesoras: [6] },
   { fase: 3, nombre: 'Tamizaje de titulos y resumenes', responsable: 'Analista de evaluacion', apoyo: ['Analista junior'], offsetInicio: 72, duracion: 16, avance: 100, predecesoras: [7] },
@@ -144,16 +144,16 @@ const PLANTILLA: PlantillaActividad[] = [
   { fase: 5, nombre: 'Redaccion del informe preliminar', responsable: 'Analista de evaluacion', apoyo: ['Metodologa'], offsetInicio: 150, duracion: 22, avance: 20, entregable: 'Informe preliminar', predecesoras: [12] },
   { fase: 5, nombre: 'Elaboracion del resumen ejecutivo', responsable: 'Lider de proyecto', offsetInicio: 168, duracion: 10, avance: 0, predecesoras: [15] },
   { fase: 5, nombre: 'Revision editorial y de estilo', responsable: 'Editora', offsetInicio: 176, duracion: 10, avance: 0, predecesoras: [16] },
-  { fase: 6, nombre: 'Consulta publica del informe preliminar', responsable: 'Gestora de proyecto', offsetInicio: 184, duracion: 20, avance: 0, entregable: 'Acta de consulta publica', predecesoras: [17] },
+  { fase: 6, nombre: 'Consulta publica del informe preliminar', responsable: 'Gestor de proyecto', offsetInicio: 184, duracion: 20, avance: 0, entregable: 'Acta de consulta publica', predecesoras: [17] },
   { fase: 6, nombre: 'Sesion con panel de expertos', responsable: 'Lider de proyecto', offsetInicio: 190, duracion: 6, avance: 0, predecesoras: [17] },
-  { fase: 6, nombre: 'Consolidacion de comentarios recibidos', responsable: 'Gestora de proyecto', offsetInicio: 202, duracion: 10, avance: 0, predecesoras: [18, 19] },
+  { fase: 6, nombre: 'Consolidacion de comentarios recibidos', responsable: 'Gestor de proyecto', offsetInicio: 202, duracion: 10, avance: 0, predecesoras: [18, 19] },
   { fase: 7, nombre: 'Incorporacion de ajustes al informe', responsable: 'Analista de evaluacion', offsetInicio: 210, duracion: 16, avance: 0, predecesoras: [20] },
   { fase: 7, nombre: 'Segunda revision metodologica', responsable: 'Metodologa', offsetInicio: 224, duracion: 10, avance: 0, predecesoras: [21] },
   { fase: 7, nombre: 'Aprobacion tecnica del informe final', responsable: 'Lider de proyecto', offsetInicio: 232, duracion: 8, avance: 0, entregable: 'Informe final aprobado', predecesoras: [22] },
   { fase: 8, nombre: 'Diagramacion y publicacion', responsable: 'Editora', offsetInicio: 240, duracion: 12, avance: 0, predecesoras: [23] },
   { fase: 8, nombre: 'Entrega formal al contratante', responsable: 'Lider de proyecto', offsetInicio: 250, duracion: 6, avance: 0, entregable: 'Acta de entrega', predecesoras: [24] },
-  { fase: 8, nombre: 'Cierre administrativo y financiero', responsable: 'Gestora de proyecto', offsetInicio: 254, duracion: 10, avance: 0, predecesoras: [25] },
-  { fase: 9, nombre: 'Seguimiento y control del proyecto', responsable: 'Gestora de proyecto', offsetInicio: 0, duracion: 264, avance: 62 },
+  { fase: 8, nombre: 'Cierre administrativo y financiero', responsable: 'Gestor de proyecto', offsetInicio: 254, duracion: 10, avance: 0, predecesoras: [25] },
+  { fase: 9, nombre: 'Seguimiento y control del proyecto', responsable: 'Gestor de proyecto', offsetInicio: 0, duracion: 264, avance: 62 },
 ]
 
 export interface ResultadoSiembra {
@@ -240,14 +240,21 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   // --- Equipo ---
   // Las tarifas hora permiten contrastar el libro presupuestal con el costo
   // teorico de la dedicacion declarada. Son valores de referencia sinteticos.
+  //
+  // Los nombres son INVENTADOS y no corresponden a ninguna persona: el
+  // repositorio no lleva datos personales. Aun asi hacen falta, porque un
+  // tablero de equipo que muestra "Metodologa" en vez de una persona no
+  // responde la pregunta de quien conforma el grupo: los perfiles se repiten y
+  // no se distinguen entre si. El perfil se conserva como dato aparte y se
+  // muestra junto al nombre.
   const equipo: MiembroEquipo[] = [
-    { perfil: 'Lider de proyecto', nombre: 'Lider de proyecto', usuarioUid: 'u-lider', dedicacionHorasMes: 60, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 95_000 },
-    { perfil: 'Gestor de proyecto', nombre: 'Gestora de proyecto', usuarioUid: 'u-gestor', dedicacionHorasMes: 120, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 62_000 },
-    { perfil: 'Analista de evaluacion', nombre: 'Analista de evaluacion', usuarioUid: 'u-miembro', dedicacionHorasMes: 160, mesesVinculacion: 11, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 54_000 },
-    { perfil: 'Metodologa', nombre: 'Metodologa', usuarioUid: null, dedicacionHorasMes: 80, mesesVinculacion: 9, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 78_000 },
-    { perfil: 'Economista de la salud', nombre: 'Economista de la salud', usuarioUid: null, dedicacionHorasMes: 100, mesesVinculacion: 7, estadoVinculacion: 'Confirmado', porDesignar: false, costoHora: 82_000 },
-    { perfil: 'Especialista en informacion', nombre: 'Especialista en informacion', usuarioUid: null, dedicacionHorasMes: 40, mesesVinculacion: 4, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 48_000 },
-    { perfil: 'Analista junior', nombre: 'Analista junior', usuarioUid: null, dedicacionHorasMes: 160, mesesVinculacion: 6, estadoVinculacion: 'Contactado', porDesignar: false, costoHora: 32_000 },
+    { perfil: 'Lider de proyecto', nombre: 'Marcela Ortiz', usuarioUid: 'u-lider', dedicacionHorasMes: 60, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 95_000 },
+    { perfil: 'Gestor de proyecto', nombre: 'Daniel Pineda', usuarioUid: 'u-gestor', dedicacionHorasMes: 120, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 62_000 },
+    { perfil: 'Analista de evaluacion', nombre: 'Juliana Bermudez', usuarioUid: 'u-miembro', dedicacionHorasMes: 160, mesesVinculacion: 11, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 54_000 },
+    { perfil: 'Metodologa', nombre: 'Carolina Vargas', usuarioUid: null, dedicacionHorasMes: 80, mesesVinculacion: 9, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 78_000 },
+    { perfil: 'Economista de la salud', nombre: 'Andres Quintero', usuarioUid: null, dedicacionHorasMes: 100, mesesVinculacion: 7, estadoVinculacion: 'Confirmado', porDesignar: false, costoHora: 82_000 },
+    { perfil: 'Especialista en informacion', nombre: 'Paola Serrano', usuarioUid: null, dedicacionHorasMes: 40, mesesVinculacion: 4, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 48_000 },
+    { perfil: 'Analista junior', nombre: 'Sebastian Lozano', usuarioUid: null, dedicacionHorasMes: 160, mesesVinculacion: 6, estadoVinculacion: 'Contactado', porDesignar: false, costoHora: 32_000 },
     // La editora queda sin tarifa a proposito: el tablero debe declarar que el
     // costo teorico del equipo esta incompleto, no fingir que no lo esta.
     { perfil: 'Editora', nombre: '', usuarioUid: null, dedicacionHorasMes: 30, mesesVinculacion: 3, estadoVinculacion: 'Por definir', porDesignar: true },
@@ -259,7 +266,11 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   })) as MiembroEquipo[]
   await ad.guardarLote(rutas.equipo(proyectoId), equipo as unknown as DocumentoBase[])
 
-  const idPorNombre = new Map(equipo.map((m) => [m.nombre || m.perfil, m.id]))
+  // La plantilla de actividades referencia PERFILES, no nombres: el perfil es
+  // lo estable —una persona puede cambiar, el rol no— y evita que renombrar a
+  // alguien rompa el enlace de sus actividades.
+  const idPorPerfil = new Map(equipo.map((m) => [m.perfil, m.id]))
+  const nombrePorPerfil = new Map(equipo.map((m) => [m.perfil, m.nombre || m.perfil]))
 
   // --- Actividades ---
   const actividades: Actividad[] = PLANTILLA.map((p, i) => ({
@@ -271,9 +282,9 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     faseId: `f${p.fase}`,
     nombre: p.nombre,
     entregable: p.entregable,
-    responsableId: idPorNombre.get(p.responsable) ?? null,
-    responsableNombre: p.responsable,
-    apoyoIds: (p.apoyo ?? []).map((a) => idPorNombre.get(a) ?? '').filter(Boolean),
+    responsableId: idPorPerfil.get(p.responsable) ?? null,
+    responsableNombre: nombrePorPerfil.get(p.responsable) ?? p.responsable,
+    apoyoIds: (p.apoyo ?? []).map((a) => idPorPerfil.get(a) ?? '').filter(Boolean),
     fechaInicio: sumarDias(inicio, p.offsetInicio),
     fechaFin: sumarDias(inicio, p.offsetInicio + p.duracion),
     avance: p.avance,
@@ -307,7 +318,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     estado: h.estado as Hito['estado'],
     condicionante: h.cond,
     actividadesIds: h.acts.map((k) => `act${String(k + 1).padStart(3, '0')}`),
-    responsableNombre: 'Lider de proyecto',
+    responsableNombre: nombrePorPerfil.get('Lider de proyecto') ?? 'Lider de proyecto',
     evidencias: [],
   })) as Hito[]
   await ad.guardarLote(rutas.hitos(proyectoId), hitos as unknown as DocumentoBase[])
@@ -317,9 +328,9 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   // el responsable final nunca son la misma persona en la misma actividad:
   // cuando el lider es el responsable de ejecutar, la A recae en el gestor.
   const raci: AsignacionRaci[] = []
-  const idLider = idPorNombre.get('Lider de proyecto')!
-  const idGestor = idPorNombre.get('Gestora de proyecto')!
-  const idMetodologa = idPorNombre.get('Metodologa')!
+  const idLider = idPorPerfil.get('Lider de proyecto')!
+  const idGestor = idPorPerfil.get('Gestor de proyecto')!
+  const idMetodologa = idPorPerfil.get('Metodologa')!
 
   const asignar = (actividadId: string, miembroId: string, letra: AsignacionRaci['letra']) => {
     if (raci.some((r) => r.actividadId === actividadId && r.miembroId === miembroId)) return
@@ -377,7 +388,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     probabilidad: r.p,
     impacto: r.i,
     planRespuesta: r.plan,
-    responsableNombre: 'Lider de proyecto',
+    responsableNombre: nombrePorPerfil.get('Lider de proyecto') ?? 'Lider de proyecto',
     estado: r.est as Riesgo['estado'],
     fechaIdentificacion: sumarDias(inicio, 10 + i * 7),
     historial: [
@@ -412,7 +423,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     cantidad: r.cant,
     fasesIds: r.fases,
     disponibilidad: r.disp as Recurso['disponibilidad'],
-    responsableNombre: 'Gestora de proyecto',
+    responsableNombre: nombrePorPerfil.get('Gestor de proyecto') ?? 'Gestor de proyecto',
   })) as Recurso[]
   await ad.guardarLote(rutas.recursos(proyectoId), recursos as unknown as DocumentoBase[])
 
@@ -439,7 +450,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     evaluado: p.evaluado,
     conforme: p.conforme,
     observaciones: p.obs,
-    responsableNombre: 'Lider de proyecto',
+    responsableNombre: nombrePorPerfil.get('Lider de proyecto') ?? 'Lider de proyecto',
     evidencias: [],
   })) as Producto[]
   await ad.guardarLote(rutas.productos(proyectoId), productos as unknown as DocumentoBase[])
@@ -462,7 +473,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     encuestados: m.enc,
     satisfechos: m.sat,
     instrumento: 'Encuesta en linea',
-    responsableNombre: 'Gestora de proyecto',
+    responsableNombre: nombrePorPerfil.get('Gestor de proyecto') ?? 'Gestor de proyecto',
   })) as MedicionSatisfaccion[]
   await ad.guardarLote(rutas.satisfaccion(proyectoId), satisfaccion as unknown as DocumentoBase[])
 
@@ -486,7 +497,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     fuente: 'Contrato interadministrativo',
     programado: r.prog,
     ejecutado: r.ejec,
-    responsableNombre: 'Lider de proyecto',
+    responsableNombre: nombrePorPerfil.get('Lider de proyecto') ?? 'Lider de proyecto',
   })) as RegistroPresupuestal[]
   await ad.guardarLote(rutas.presupuesto(proyectoId), presupuesto as unknown as DocumentoBase[])
 
@@ -593,6 +604,17 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     actividadesTomadas: number
     riesgosTomados: number
     estado: Proyecto['estado']
+    /**
+     * Equipo del proyecto, por perfil.
+     *
+     * Varios de estos perfiles corresponden a las MISMAS personas del proyecto
+     * de referencia: en un instituto, la metodologa o la especialista en
+     * informacion sirven a varias evaluaciones a la vez. Esa superposicion es
+     * justamente lo que el tablero de personas del portafolio tiene que dejar
+     * ver, porque es donde se forman los cuellos de botella: cada proyecto se
+     * ve holgado por separado y la persona esta saturada al sumarlos.
+     */
+    integrantes: { perfil: string; dedicacionHorasMes: number; compartido?: boolean }[]
   }
 
   const perfiles: PerfilProyecto[] = [
@@ -610,6 +632,12 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
       cumplimientoAvance: 0.72,
       factorGasto: 1.18,
       actividadesTomadas: 16,
+      integrantes: [
+        { perfil: 'Lider de proyecto', dedicacionHorasMes: 40, compartido: true },
+        { perfil: 'Metodologa', dedicacionHorasMes: 70, compartido: true },
+        { perfil: 'Especialista en informacion', dedicacionHorasMes: 50, compartido: true },
+        { perfil: 'Analista clinico', dedicacionHorasMes: 120 },
+      ],
       riesgosTomados: 6,
       estado: 'activo',
     },
@@ -627,6 +655,11 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
       cumplimientoAvance: 1.02,
       factorGasto: 0.94,
       actividadesTomadas: 12,
+      integrantes: [
+        { perfil: 'Gestor de proyecto', dedicacionHorasMes: 50, compartido: true },
+        { perfil: 'Economista de la salud', dedicacionHorasMes: 80, compartido: true },
+        { perfil: 'Analista junior', dedicacionHorasMes: 60, compartido: true },
+      ],
       riesgosTomados: 4,
       estado: 'activo',
     },
@@ -644,6 +677,13 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
       cumplimientoAvance: 0.61,
       factorGasto: 1.34,
       actividadesTomadas: 20,
+      integrantes: [
+        { perfil: 'Metodologa', dedicacionHorasMes: 60, compartido: true },
+        { perfil: 'Economista de la salud', dedicacionHorasMes: 70, compartido: true },
+        { perfil: 'Especialista en informacion', dedicacionHorasMes: 40, compartido: true },
+        { perfil: 'Coordinadora de registro', dedicacionHorasMes: 100 },
+        { perfil: 'Analista de datos', dedicacionHorasMes: 0 },
+      ],
       riesgosTomados: 9,
       estado: 'activo',
     },
@@ -678,6 +718,38 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     }
     await ad.guardar(rutas.proyectos(), proyectoP as unknown as DocumentoBase)
 
+    // --- Equipo del proyecto ---
+    // Cuando el perfil se marca como compartido, la persona es la MISMA del
+    // proyecto de referencia: mismo nombre y mismo usuario institucional. Asi
+    // el tablero de personas del portafolio puede consolidarla en una sola
+    // fila y sumar su dedicacion entre proyectos, que es la lectura que
+    // interesa. Los perfiles no compartidos son personas propias de este
+    // proyecto.
+    const nombresPropios: Record<string, string> = {
+      'Analista clinico': 'Mauricio Delgado',
+      'Coordinadora de registro': 'Tatiana Gomez',
+      'Analista de datos': 'Felipe Cardenas',
+    }
+    const equipoP: MiembroEquipo[] = perfil.integrantes.map((it, k) => {
+      const referencia = equipo.find((m) => m.perfil === it.perfil)
+      const compartido = Boolean(it.compartido && referencia)
+      return {
+        id: `${perfil.id}-eq${k + 1}`,
+        proyectoId: perfil.id,
+        ...meta('u-lider'),
+        perfil: it.perfil,
+        nombre: compartido ? referencia!.nombre : (nombresPropios[it.perfil] ?? ''),
+        porDesignar: !compartido && !nombresPropios[it.perfil],
+        usuarioUid: compartido ? referencia!.usuarioUid : null,
+        dedicacionHorasMes: it.dedicacionHorasMes,
+        mesesVinculacion: perfil.mesesTranscurridos,
+        estadoVinculacion: 'Contratado',
+        costoHora: compartido ? referencia!.costoHora : undefined,
+      } as MiembroEquipo
+    })
+    await ad.guardarLote(rutas.equipo(perfil.id), equipoP as unknown as DocumentoBase[])
+    const idPorPerfilP = new Map(equipoP.map((m) => [m.perfil, m]))
+
     // Actividades escaladas al horizonte del proyecto. El avance de cada una se
     // deriva del avance planeado a la fecha de corte por el factor de
     // cumplimiento del perfil: asi el indice de cronograma sale del dato, no de
@@ -695,8 +767,9 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
         faseId: `f${pl.fase}`,
         nombre: pl.nombre,
         entregable: pl.entregable,
-        responsableId: null,
-        responsableNombre: pl.responsable,
+        responsableId: idPorPerfilP.get(pl.responsable)?.id ?? null,
+        responsableNombre:
+          idPorPerfilP.get(pl.responsable)?.nombre || pl.responsable,
         apoyoIds: [],
         fechaInicio: inicioAct,
         fechaFin: finAct,
@@ -711,7 +784,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     const resumenP = resumirProyecto(
       {
         proyecto: proyectoP,
-        equipo: [],
+        equipo: equipoP,
         actividades: actividadesP,
         hitos: [],
         raci: [],
@@ -735,7 +808,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
       fuente: perfil.financiador === 'Recursos propios' ? 'Recursos propios' : 'Convenio',
       programado: Math.round(perfil.presupuestoTotal / (perfil.duracionDias / 30)),
       ejecutado: Math.round(gastoTotalP / mesesGasto),
-      responsableNombre: 'Lider de proyecto',
+      responsableNombre: nombrePorPerfil.get('Lider de proyecto') ?? 'Lider de proyecto',
     }))
     await ad.guardarLote(rutas.presupuesto(perfil.id), presupuestoP as unknown as DocumentoBase[])
 
@@ -757,7 +830,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     await generarInstantaneas(
       {
         proyecto: proyectoP,
-        equipo: [],
+        equipo: equipoP,
         actividades: actividadesP,
         hitos: hitosP,
         raci: [],

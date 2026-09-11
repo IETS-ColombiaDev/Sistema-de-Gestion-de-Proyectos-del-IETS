@@ -28,25 +28,31 @@ import { Cargando, Vacio } from '@/components/EstadoVista'
 import FiltroBarra, { useFiltros, type DefinicionFiltro } from '@/components/FiltroBarra'
 import { Pista } from '@/components/Ayuda'
 import {
-  BarraApilada,
+  MatrizAsignacion,
+  ALTO,
+  BarrasAgrupadas,
   BarrasDivergentes,
   Bullet,
+  CargaPersonas,
   Cascada,
   CurvaS,
   DIVERGENTE,
+  Dona,
   ESTADO,
   Figura,
+  LineaHitos,
   Pareto,
   RELLENO_RECURSO,
   RELLENO_RIESGO,
   SERIE_EVM,
   Sparkline,
+  colorSerie,
   tonoDivergente,
 } from '@/components/charts'
+import type { FilaAsignacion } from '@/components/charts'
 import { pareto } from '@/domain/costos'
-import { esMovil, useMedia } from '@/lib/useMedia'
 import { estadoColors } from '@/styles/theme'
-import {
+import { IconFlechaDer,
   IconAdvertencia,
   IconCheck,
   IconError,
@@ -57,7 +63,7 @@ import {
 import { useProyecto } from '@/app/ProyectoContext'
 import { definicionPorCodigo, formatearValorIndicador } from '@/domain/indicadores'
 import { formatearFecha } from '@/domain/fechas'
-import { conSigno, moneda, monedaCorta, porcentaje } from '@/lib/formato'
+import { iniciales, conSigno, moneda, monedaCorta, porcentaje } from '@/lib/formato'
 import {
   CATEGORIAS_INDICADOR,
   DISPONIBILIDAD_RECURSO,
@@ -74,14 +80,12 @@ const COLOR_VEREDICTO: Record<Diagnostico['severidad'], { fg: string; bg: string
   neutro: { fg: '#64748B', bg: '#F1F5F9', Icono: IconInfo },
 }
 
-type Vista = 'valor' | 'operacion' | 'indicadores'
+type Vista = 'valor' | 'operacion' | 'equipo' | 'hitos' | 'indicadores'
 
 export default function DashboardEjecutivo() {
   const { datos, resumen, analisis, indicadores, catalogoIndicadores, alertas, instantaneas, cargando, recalcular } =
     useProyecto()
   const [vista, setVista] = useState<Vista>('valor')
-  // Pantalla estrecha: los graficos agrandan su texto y simplifican los ejes.
-  const compacto = useMedia(esMovil)
 
   const proyecto = datos?.proyecto
   const fmt = (n: number) => monedaCorta(n)
@@ -163,6 +167,149 @@ export default function DashboardEjecutivo() {
   const tendenciaAvance = useMemo(
     () => instantaneas.map((s) => s.avancePonderado),
     [instantaneas],
+  )
+
+  /**
+   * Carga de trabajo por persona: actividades donde figura como responsable,
+   * desagregadas por estado. Es lo que permite ver si el trabajo esta repartido
+   * o concentrado, que el avance del proyecto por si solo no dice.
+   */
+  /**
+   * Quienes conforman el equipo, con lo que cada uno tiene entre manos.
+   *
+   * `resumen.equipo` da los totales, pero no dice quien es quien. Esta es la
+   * nomina: la persona, el rol que ocupa, su vinculacion y la actividad en la
+   * que esta ahora. Un perfil sin designar se lista igual, porque es capacidad
+   * planeada que todavia no existe y esconderlo la haria parecer disponible.
+   */
+  const nomina = useMemo(() => {
+    if (!datos || !resumen) return []
+    const fases = new Map(resumen.porFase.map((f) => [f.faseId, f.nombre]))
+    return datos.equipo
+      .filter((m) => !m.eliminado)
+      .map((m) => {
+        const suyas = resumen.actividades.filter(
+          (a) => !a.vacia && (a.responsableId === m.id || a.responsableNombre === (m.nombre || m.perfil)),
+        )
+        const enCurso = suyas.filter((a) => a.estado === 'En curso')
+        const retrasadas = suyas.filter((a) => a.estado === 'Retrasada')
+        const apoyo = resumen.actividades.filter((a) => !a.vacia && a.apoyoIds.includes(m.id))
+        // "Donde esta" es la actividad en curso; si no hay ninguna, lo que
+        // tiene retrasado; si tampoco, se dice que no tiene trabajo en marcha
+        // en vez de dejar la celda muda.
+        const ubicacion = enCurso[0] ?? retrasadas[0] ?? null
+        return {
+          id: m.id,
+          nombre: m.porDesignar ? '— por designar —' : m.nombre || m.perfil,
+          perfil: m.perfil,
+          porDesignar: m.porDesignar,
+          vinculacion: m.estadoVinculacion,
+          dedicacion: m.dedicacionHorasMes,
+          meses: m.mesesVinculacion,
+          correo: m.correo ?? '',
+          actividades: suyas.length,
+          apoyos: apoyo.length,
+          retrasadas: retrasadas.length,
+          enQue: ubicacion ? ubicacion.nombre : null,
+          enQueEstado: ubicacion ? ubicacion.estado : null,
+          fase: ubicacion ? (fases.get(ubicacion.faseId) ?? '—') : null,
+        }
+      })
+      .sort((a, b) => b.actividades - a.actividades || a.nombre.localeCompare(b.nombre))
+  }, [datos, resumen])
+
+  /** Personas contra fases: donde esta repartido el equipo. */
+  const matrizEquipo = useMemo(() => {
+    if (!datos || !resumen) return { columnas: [] as string[], filas: [] as FilaAsignacion[] }
+    // La lista de fases es la del proyecto, consumida del resumen: el tablero
+    // no mantiene una copia propia (D-08).
+    const fases = resumen.porFase
+    const columnas = fases.map((f) => f.nombre)
+    const filas = datos.equipo
+      .filter((m) => !m.eliminado)
+      .map((m) => {
+        const suyas = resumen.actividades.filter(
+          (a) => !a.vacia && (a.responsableId === m.id || a.responsableNombre === (m.nombre || m.perfil)),
+        )
+        const celdas = fases.map((f) => {
+          const enFase = suyas.filter((a) => a.faseId === f.faseId)
+          return {
+            total: enFase.length,
+            retrasadas: enFase.filter((a) => a.estado === 'Retrasada').length,
+          }
+        })
+        return {
+          id: m.id,
+          nombre: m.porDesignar ? '— por designar —' : m.nombre || m.perfil,
+          perfil: m.perfil,
+          celdas,
+          total: suyas.length,
+        }
+      })
+      .filter((f) => f.total > 0)
+      .sort((a, b) => b.total - a.total)
+    return { columnas, filas }
+  }, [datos, resumen])
+
+  const cargaEquipo = useMemo(() => {
+    if (!datos || !resumen) return []
+    const actividades = resumen.actividades.filter(
+      (a) => !a.vacia && (!valores.fase || a.faseId === valores.fase),
+    )
+    const raciPorMiembro = new Map<string, number>()
+    for (const asignacion of datos.raci) {
+      if (asignacion.eliminado) continue
+      raciPorMiembro.set(asignacion.miembroId, (raciPorMiembro.get(asignacion.miembroId) ?? 0) + 1)
+    }
+
+    return datos.equipo
+      .map((m) => {
+        const propias = actividades.filter(
+          (a) => a.responsableId === m.id || a.responsableNombre === (m.nombre || m.perfil),
+        )
+        const porEstado = (estado: string) => propias.filter((a) => a.estado === estado).length
+        const retrasadas = porEstado('Retrasada')
+        return {
+          id: m.id,
+          nombre: m.porDesignar ? `${m.perfil} (por designar)` : m.nombre || m.perfil,
+          perfil: m.perfil,
+          secundaria: `${m.dedicacionHorasMes} h/mes · ${raciPorMiembro.get(m.id) ?? 0} asignacion(es) RACI`,
+          aviso: m.porDesignar
+            ? 'Perfil sin persona designada'
+            : retrasadas > 0
+              ? `${retrasadas} actividad(es) retrasada(s)`
+              : undefined,
+          segmentos: [
+            { etiqueta: 'Completada', valor: porEstado('Completada'), color: estadoColors.actividad.Completada.bar },
+            { etiqueta: 'En curso', valor: porEstado('En curso'), color: estadoColors.actividad['En curso'].bar },
+            { etiqueta: 'Pendiente', valor: porEstado('Pendiente'), color: estadoColors.actividad.Pendiente.bar },
+            { etiqueta: 'Retrasada', valor: retrasadas, color: estadoColors.actividad.Retrasada.bar },
+          ],
+        }
+      })
+      .sort(
+        (a, b) =>
+          b.segmentos.reduce((s, x) => s + x.valor, 0) - a.segmentos.reduce((s, x) => s + x.valor, 0),
+      )
+  }, [datos, resumen, valores.fase])
+
+  /** Hitos con fecha, para la linea de tiempo. */
+  const hitosLinea = useMemo(
+    () =>
+      (resumen?.hitos ?? [])
+        .filter((h) => h.fechaProgramada)
+        .map((h) => ({
+          id: h.id,
+          descripcion: h.descripcion,
+          fecha: h.fechaProgramada as string,
+          estado: h.estado,
+          color: estadoColors.hito[h.estado]?.fg ?? '#64748B',
+          cumplido: h.cumplido,
+          vencido: h.vencido,
+          condicionante: h.condicionante,
+          desviacionDias: h.desviacionDias,
+        })),
+    [resumen],
   )
 
   if (cargando || !datos || !resumen || !analisis || !proyecto) return <Cargando />
@@ -367,8 +514,14 @@ export default function DashboardEjecutivo() {
       <Tabs
         opciones={[
           { valor: 'valor', etiqueta: 'Valor y costo' },
-          { valor: 'operacion', etiqueta: 'Operacion' },
-          { valor: 'indicadores', etiqueta: 'Indicadores', conteo: indicadores.filter((i) => i.estado === 'Critico').length },
+          { valor: 'operacion', etiqueta: 'Operacion', conteo: resumen.retrasadas.length },
+          { valor: 'equipo', etiqueta: 'Equipo', conteo: resumen.equipo.porDefinir },
+          { valor: 'hitos', etiqueta: 'Hitos', conteo: resumen.hitos.filter((h) => h.vencido).length },
+          {
+            valor: 'indicadores',
+            etiqueta: 'Indicadores',
+            conteo: indicadores.filter((i) => i.estado === 'Critico').length,
+          },
         ]}
         activa={vista}
         onCambiar={(x) => setVista(x as Vista)}
@@ -430,7 +583,7 @@ export default function DashboardEjecutivo() {
                 puntos={curva.puntos}
                 formato={fmt}
                 presupuesto={evm.presupuestoTotal}
-                compacto={compacto}
+                alto={ALTO.lg}
               />
             </Figura>
 
@@ -480,7 +633,7 @@ export default function DashboardEjecutivo() {
                   />
                 }
               >
-                <Cascada pasos={cascada} formato={fmt} compacto={compacto} />
+                <Cascada pasos={cascada} formato={fmt} />
               </Figura>
               {evm.eficienciaRequerida != null && (
                 <div
@@ -548,40 +701,40 @@ export default function DashboardEjecutivo() {
                   <Pareto
                     lineas={gastoFiltrado.map((l) => ({ ...l, importe: l.ejecutado }))}
                     formato={fmtExacto}
-                    compacto={compacto}
                   />
                 </Figura>
               )}
-              <div className="hg-grid hg-grid--3" style={{ marginTop: 'var(--sp-md)' }}>
-                <KPICard
-                  etiqueta="Ritmo de gasto"
-                  valor={fmt(costos.ritmoMensual)}
-                  pie="Promedio de los ultimos periodos con movimiento"
-                  pista="Promedio del gasto de los tres ultimos periodos con movimiento. Tres suaviza un mes atipico sin diluir un cambio real de tendencia."
-                />
-                <KPICard
-                  etiqueta="Cobertura restante"
-                  valor={costos.mesesDeCobertura == null ? '—' : `${costos.mesesDeCobertura} meses`}
-                  color={
-                    costos.mesesDeCobertura != null && costos.mesesDeCobertura < 2
-                      ? ESTADO.critico
-                      : undefined
-                  }
-                  pie="Al ritmo actual, con lo que queda"
-                  pista="Presupuesto disponible dividido por el ritmo de gasto. Es el horizonte antes de quedarse sin recursos."
-                />
-                <KPICard
-                  etiqueta="Comprometido"
-                  valor={fmt(costos.comprometidoTotal)}
-                  pie={
-                    costos.origen === 'interno'
-                      ? 'El libro interno no lo distingue aun'
-                      : `Segun ${costos.nombreFuente}`
-                  }
-                  pista="Ordenes y contratos firmados y no causados. El libro presupuestal interno no separa este concepto; la herramienta de costos si lo hara."
-                />
-              </div>
             </Card>
+          </div>
+
+          <div className="hg-grid hg-grid--kpi">
+            <KPICard
+              etiqueta="Ritmo de gasto"
+              valor={fmt(costos.ritmoMensual)}
+              pie="Promedio de los ultimos periodos con movimiento"
+              pista="Promedio del gasto de los tres ultimos periodos con movimiento. Tres suaviza un mes atipico sin diluir un cambio real de tendencia."
+            />
+            <KPICard
+              etiqueta="Cobertura restante"
+              valor={costos.mesesDeCobertura == null ? '—' : `${costos.mesesDeCobertura} meses`}
+              color={
+                costos.mesesDeCobertura != null && costos.mesesDeCobertura < 2
+                  ? ESTADO.critico
+                  : undefined
+              }
+              pie="Al ritmo actual, con lo que queda"
+              pista="Presupuesto disponible dividido por el ritmo de gasto. Es el horizonte antes de quedarse sin recursos."
+            />
+            <KPICard
+              etiqueta="Comprometido"
+              valor={fmt(costos.comprometidoTotal)}
+              pie={
+                costos.origen === 'interno'
+                  ? 'El libro interno no lo distingue aun'
+                  : `Segun ${costos.nombreFuente}`
+              }
+              pista="Ordenes y contratos firmados y no causados. El libro presupuestal interno no separa este concepto; la herramienta de costos si lo hara."
+            />
           </div>
 
           <Card
@@ -659,7 +812,10 @@ export default function DashboardEjecutivo() {
       {vista === 'operacion' && (
         <div className="hg-pila">
           <div className="hg-grid hg-grid--2">
-            <Card titulo="Actividades por estado">
+            <Card
+              titulo="Reparto de actividades"
+              subtitulo="Como se distribuyen las actividades vigentes entre los cuatro estados."
+            >
               <Figura
                 tabla={
                   <Table
@@ -677,17 +833,18 @@ export default function DashboardEjecutivo() {
                   />
                 }
               >
-                <BarraApilada
-                  segmentos={resumen.distribucion.map((d) => ({
+                <Dona
+                  porciones={resumen.distribucion.map((d) => ({
                     etiqueta: d.estado || 'Sin estado',
                     valor: d.conteo,
                     color: d.estado ? estadoColors.actividad[d.estado].bar : '#CBD5E1',
                   }))}
+                  etiquetaCentro="actividades"
                 />
               </Figura>
             </Card>
 
-            <Card titulo="Riesgos por nivel" subtitulo="Solo riesgos abiertos.">
+            <Card titulo="Riesgos abiertos por nivel" subtitulo="Severidad de los riesgos que siguen vivos.">
               <Figura
                 tabla={
                   <Table
@@ -703,17 +860,69 @@ export default function DashboardEjecutivo() {
                   />
                 }
               >
-                <BarraApilada
-                  segmentos={NIVELES_RIESGO.map((nivel) => ({
+                <Dona
+                  porciones={NIVELES_RIESGO.map((nivel) => ({
                     etiqueta: nivel,
                     valor: resumen.riesgos.filter((r) => r.nivel === nivel && r.estado !== 'Cerrado').length,
                     color: RELLENO_RIESGO[nivel],
                   }))}
+                  etiquetaCentro="riesgos abiertos"
                 />
               </Figura>
             </Card>
+          </div>
 
-            <Card titulo="Recursos por disponibilidad">
+          <Card
+            titulo="Avance real frente a lo programado, fase por fase"
+            subtitulo="Dos barras por fase sobre la misma linea base: la diferencia de altura es la desviacion."
+          >
+            {fases.length === 0 ? (
+              <Vacio titulo="Sin fases con actividades" texto="Asigne fase a las actividades del cronograma." />
+            ) : (
+              <Figura
+                leyenda={[
+                  { etiqueta: 'Avance real', color: colorSerie(0) },
+                  { etiqueta: 'Avance esperado', color: colorSerie(1) },
+                ]}
+                tabla={
+                  <Table
+                    anchoMinimo="700px"
+                    columnas={[
+                      { clave: 'nombre', titulo: 'Fase', render: (f: (typeof fases)[number]) => f.nombre },
+                      { clave: 'actividades', titulo: 'Actividades', alineacion: 'derecha', render: (f) => f.actividades },
+                      { clave: 'avance', titulo: 'Real', alineacion: 'derecha', render: (f) => porcentaje(f.avance) },
+                      {
+                        clave: 'avanceEsperado',
+                        titulo: 'Esperado',
+                        alineacion: 'derecha',
+                        render: (f) => porcentaje(f.avanceEsperado),
+                      },
+                      { clave: 'retrasadas', titulo: 'Retrasadas', alineacion: 'derecha', render: (f) => f.retrasadas },
+                    ]}
+                    filas={fases}
+                    claveDe={(f) => f.faseId}
+                  />
+                }
+              >
+                <BarrasAgrupadas
+                  grupos={fases.map((f) => ({
+                    etiqueta: f.nombre,
+                    valores: [f.avance, f.avanceEsperado],
+                    detalle: `${f.actividades} actividad(es) · ${f.retrasadas} retrasada(s)`,
+                  }))}
+                  series={[
+                    { nombre: 'Avance real', color: colorSerie(0) },
+                    { nombre: 'Avance esperado', color: colorSerie(1) },
+                  ]}
+                  formato={(n) => `${n.toFixed(0)} %`}
+                  sufijo=" %"
+                />
+              </Figura>
+            )}
+          </Card>
+
+          <div className="hg-grid hg-grid--2">
+            <Card titulo="Recursos por disponibilidad" subtitulo="Lo que esta asegurado y lo que falta gestionar.">
               <Figura
                 tabla={
                   <Table
@@ -729,134 +938,529 @@ export default function DashboardEjecutivo() {
                   />
                 }
               >
-                <BarraApilada
-                  segmentos={DISPONIBILIDAD_RECURSO.map((d) => ({
+                <Dona
+                  porciones={DISPONIBILIDAD_RECURSO.map((d) => ({
                     etiqueta: d,
                     valor: datos.recursos.filter((r) => r.disponibilidad === d).length,
                     color: RELLENO_RECURSO[d],
                   }))}
+                  etiquetaCentro="recursos"
                 />
               </Figura>
               {resumen.recursos.porGestionar > 0 && (
-                <p className="hg-t-xs" style={{ marginTop: 'var(--sp-xs)', color: '#92400E' }}>
-                  {resumen.recursos.porGestionar} recurso(s) por gestionar requieren accion.
+                <p className="hg-t-xs" style={{ marginTop: 'var(--sp-sm)', color: '#92400E' }}>
+                  {resumen.recursos.porGestionar} recurso(s) por gestionar requieren accion antes de la fase en
+                  que se necesitan.
                 </p>
               )}
             </Card>
 
-            <Card titulo="Hitos y entregables">
-              <div className="hg-grid hg-grid--3">
-                <KPICard etiqueta="Cumplidos" valor={hitos.cumplidos} color={ESTADO.bueno} />
-                <KPICard etiqueta="Pendientes" valor={hitos.pendientes} />
-                <KPICard
-                  etiqueta="Vencidos"
-                  valor={hitos.vencidos}
-                  color={hitos.vencidos > 0 ? ESTADO.critico : undefined}
+            <Card
+              titulo="Alertas activas"
+              subtitulo="Cada alerta lleva su regla de origen y la ruta donde se resuelve."
+            >
+              {alertasFiltradas.length === 0 ? (
+                <Vacio
+                  titulo={
+                    activos.includes('severidad') ? 'Sin alertas de esa severidad' : 'El proyecto no presenta alertas'
+                  }
+                  texto="A la fecha de corte no hay desviaciones que requieran atencion."
+                  icono={<IconCheck size={24} />}
                 />
-              </div>
-              <div style={{ marginTop: 'var(--sp-md)' }}>
-                <Table
-                  columnas={[
-                    {
-                      clave: 'descripcion',
-                      titulo: 'Proximos hitos',
-                      render: (h) => <span className="hg-t-sm">{h.descripcion}</span>,
-                    },
-                    { clave: 'fecha', titulo: 'Programado', render: (h) => formatearFecha(h.fechaProgramada) },
-                    { clave: 'estado', titulo: 'Estado', render: (h) => <BadgeEstado familia="hito" valor={h.estado} /> },
-                  ]}
-                  filas={resumen.hitos
-                    .filter((h) => !h.cumplido)
-                    .sort((a, b) => (a.fechaProgramada ?? '').localeCompare(b.fechaProgramada ?? ''))
-                    .slice(0, 4)}
-                  claveDe={(h) => h.id}
-                  vacio="Todos los hitos estan cumplidos."
-                />
-              </div>
+              ) : (
+                <div className="hg-pila" style={{ gap: 'var(--sp-xs)' }}>
+                  {alertasFiltradas.slice(0, 6).map((a) => (
+                    <div
+                      key={a.id}
+                      className="hg-fila"
+                      style={{
+                        gap: 'var(--sp-xs)',
+                        padding: 'var(--sp-xs) var(--sp-sm)',
+                        borderRadius: 'var(--r-base)',
+                        borderLeft: `3px solid ${
+                          a.severidad === 'critica'
+                            ? ESTADO.critico
+                            : a.severidad === 'alta'
+                              ? ESTADO.serio
+                              : ESTADO.advertencia
+                        }`,
+                        background: 'var(--c-bg-hover)',
+                        alignItems: 'flex-start',
+                        flexWrap: 'nowrap',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="hg-t-sm hg-t-bold">{a.titulo}</div>
+                        <div className="hg-t-xs hg-t-sec">
+                          {a.modulo} · {a.regla}
+                        </div>
+                      </div>
+                      <Link to={a.ruta} className="hg-t-xs" style={{ flex: 'none' }}>
+                        Resolver
+                      </Link>
+                    </div>
+                  ))}
+                  {alertasFiltradas.length > 6 && (
+                    <Link to={`/proyectos/${proyecto.id}/tablero`} className="hg-t-xs">
+                      Ver las {alertasFiltradas.length} alertas en el centro de alertas
+                    </Link>
+                  )}
+                </div>
+              )}
             </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/* Equipo                                                            */}
+      {/* ================================================================ */}
+      {vista === 'equipo' && (
+        <div className="hg-pila">
+          <div className="hg-grid hg-grid--kpi">
+            <KPICard
+              etiqueta="Integrantes"
+              valor={resumen.equipo.total}
+              pie={`${resumen.equipo.contratados} contratado(s)`}
+              acento={colorSerie(0)}
+            />
+            <KPICard
+              etiqueta="Perfiles por designar"
+              valor={resumen.equipo.porDefinir}
+              color={resumen.equipo.porDefinir > 0 ? ESTADO.advertencia : ESTADO.bueno}
+              pie="Registrados sin persona asignada"
+              acento={ESTADO.advertencia}
+              pista="Un perfil sin persona designada es capacidad planeada que todavia no existe."
+            />
+            <KPICard
+              etiqueta="Dedicacion del equipo"
+              valor={`${resumen.equipo.dedicacionTotalHorasMes} h/mes`}
+              pie="Suma de la dedicacion declarada"
+              acento={colorSerie(1)}
+            />
+            <KPICard
+              etiqueta="Actividades sin responsable"
+              valor={
+                resumen.actividades.filter((a) => !a.vacia && !a.responsableNombre.trim()).length
+              }
+              color={
+                resumen.actividades.filter((a) => !a.vacia && !a.responsableNombre.trim()).length > 0
+                  ? ESTADO.critico
+                  : ESTADO.bueno
+              }
+              pie="Trabajo que no tiene a quien preguntarle"
+              acento={ESTADO.critico}
+            />
           </div>
 
           <Card
-            titulo="Alertas activas"
-            subtitulo="Cada alerta lleva su regla de origen y la ruta donde se resuelve."
+            titulo="Quienes conforman el equipo"
+            subtitulo={`${nomina.length} persona(s) registradas en el grupo desarrollador, con la actividad en la que estan ahora.`}
+            acciones={
+              <Link to={`/proyectos/${proyecto.id}/equipo`} className="hg-btn hg-btn--ghost hg-btn--sm no-print">
+                Administrar equipo <IconFlechaDer size={14} />
+              </Link>
+            }
           >
-            {alertasFiltradas.length === 0 ? (
+            {nomina.length === 0 ? (
               <Vacio
-                titulo={activos.includes('severidad') ? 'Sin alertas de esa severidad' : 'El proyecto no presenta alertas'}
-                texto="A la fecha de corte no hay desviaciones que requieran atencion."
-                icono={<IconCheck size={24} />}
+                titulo="Sin grupo desarrollador"
+                texto="Registre los perfiles del equipo en el modulo Grupo desarrollador."
               />
             ) : (
               <Table
-                anchoMinimo="760px"
+                anchoMinimo="880px"
                 columnas={[
                   {
-                    clave: 'severidad',
-                    titulo: 'Severidad',
-                    ancho: '116px',
-                    render: (a) => (
-                      <Badge
-                        fg={
-                          a.severidad === 'critica'
-                            ? '#B91C1C'
-                            : a.severidad === 'alta'
-                              ? '#C2410C'
-                              : a.severidad === 'media'
-                                ? '#92400E'
-                                : '#1D4ED8'
-                        }
-                        bg={
-                          a.severidad === 'critica'
-                            ? '#FEE2E2'
-                            : a.severidad === 'alta'
-                              ? '#FFEDD5'
-                              : a.severidad === 'media'
-                                ? '#FEF3C7'
-                                : '#DBEAFE'
-                        }
-                        punto
-                      >
-                        {a.severidad}
-                      </Badge>
-                    ),
-                  },
-                  {
-                    clave: 'titulo',
-                    titulo: 'Alerta',
-                    render: (a) => (
-                      <div>
-                        <span className="hg-t-sm hg-t-bold">{a.titulo}</span>
-                        <div className="hg-t-xs hg-t-sec">{a.mensaje}</div>
+                    clave: 'nombre',
+                    titulo: 'Persona',
+                    render: (m: (typeof nomina)[number]) => (
+                      <div className="hg-fila" style={{ gap: 'var(--sp-xs)' }}>
+                        <span className="hg-avatar hg-avatar--sm" aria-hidden="true">
+                          {m.porDesignar ? '?' : iniciales(m.nombre)}
+                        </span>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="hg-t-sm">{m.nombre}</div>
+                          {m.correo && <div className="hg-t-xs hg-t-ter">{m.correo}</div>}
+                        </div>
                       </div>
                     ),
                   },
-                  { clave: 'modulo', titulo: 'Modulo', ancho: '120px', render: (a) => a.modulo },
+                  { clave: 'perfil', titulo: 'Perfil', render: (m) => m.perfil },
                   {
-                    clave: 'regla',
-                    titulo: 'Regla',
-                    ancho: '90px',
-                    render: (a) => (
-                      <Badge fg="#94A3B8" bg="#F8FAFC" titulo="Regla de negocio que genera la alerta">
-                        {a.regla}
-                      </Badge>
+                    clave: 'vinculacion',
+                    titulo: 'Vinculacion',
+                    render: (m) => <BadgeEstado familia="recurso" valor={m.vinculacion} />,
+                  },
+                  {
+                    clave: 'dedicacion',
+                    titulo: 'Dedicacion',
+                    alineacion: 'derecha',
+                    render: (m) => `${m.dedicacion} h/mes`,
+                  },
+                  {
+                    clave: 'enQue',
+                    titulo: 'En que esta',
+                    render: (m) =>
+                      m.enQue == null ? (
+                        <span className="hg-t-xs hg-t-ter">Sin actividad en marcha</span>
+                      ) : (
+                        <div style={{ minWidth: 0 }}>
+                          <div className="hg-t-sm">{m.enQue}</div>
+                          <div className="hg-t-xs hg-t-ter">
+                            {m.fase} · {m.enQueEstado}
+                          </div>
+                        </div>
+                      ),
+                  },
+                  {
+                    clave: 'actividades',
+                    titulo: 'A cargo',
+                    alineacion: 'derecha',
+                    render: (m) => (
+                      <span className="hg-t-num">
+                        {m.actividades}
+                        {m.apoyos > 0 && <span className="hg-t-xs hg-t-ter"> +{m.apoyos} apoyo</span>}
+                      </span>
                     ),
                   },
                   {
-                    clave: 'ir',
-                    titulo: '',
+                    clave: 'retrasadas',
+                    titulo: 'Retrasadas',
                     alineacion: 'derecha',
-                    render: (a) => (
-                      <Link to={a.ruta} className="hg-t-xs">
-                        Resolver
-                      </Link>
-                    ),
+                    render: (m) =>
+                      m.retrasadas > 0 ? (
+                        <strong className="hg-t-num" style={{ color: ESTADO.critico }}>
+                          {m.retrasadas}
+                        </strong>
+                      ) : (
+                        <span className="hg-t-ter">—</span>
+                      ),
                   },
                 ]}
-                filas={alertasFiltradas}
-                claveDe={(a) => a.id}
+                filas={nomina}
+                claveDe={(m) => m.id}
               />
             )}
           </Card>
+
+          <Card
+            titulo="Donde esta el equipo"
+            subtitulo="Personas contra fases del proyecto. Deja ver si el equipo esta amontonado en una fase y ausente en la siguiente."
+          >
+            {matrizEquipo.filas.length === 0 ? (
+              <Vacio
+                titulo="Sin asignaciones por fase"
+                texto="Ninguna actividad tiene responsable del grupo desarrollador."
+              />
+            ) : (
+              <Figura
+                tabla={
+                  <Table
+                    anchoMinimo="720px"
+                    columnas={[
+                      {
+                        clave: 'nombre',
+                        titulo: 'Persona',
+                        render: (f: (typeof matrizEquipo.filas)[number]) => f.nombre,
+                      },
+                      ...matrizEquipo.columnas.map((c, i) => ({
+                        clave: c,
+                        titulo: c,
+                        alineacion: 'derecha' as const,
+                        render: (f: (typeof matrizEquipo.filas)[number]) => f.celdas[i]?.total ?? 0,
+                      })),
+                      {
+                        clave: 'total',
+                        titulo: 'Total',
+                        alineacion: 'derecha',
+                        render: (f) => f.total,
+                      },
+                    ]}
+                    filas={matrizEquipo.filas}
+                    claveDe={(f) => f.id}
+                  />
+                }
+              >
+                <MatrizAsignacion filas={matrizEquipo.filas} columnas={matrizEquipo.columnas} />
+              </Figura>
+            )}
+          </Card>
+
+          <Card
+            titulo="Carga de trabajo por persona"
+            subtitulo="Actividades donde figura como responsable, desagregadas por estado."
+          >
+            <Figura
+              leyenda={(['Completada', 'En curso', 'Pendiente', 'Retrasada'] as const).map((e) => ({
+                etiqueta: e,
+                color: estadoColors.actividad[e].bar,
+              }))}
+              tabla={
+                <Table
+                  anchoMinimo="720px"
+                  columnas={[
+                    { clave: 'nombre', titulo: 'Persona', render: (p: (typeof cargaEquipo)[number]) => p.nombre },
+                    { clave: 'perfil', titulo: 'Perfil', render: (p) => p.perfil },
+                    {
+                      clave: 'total',
+                      titulo: 'Actividades',
+                      alineacion: 'derecha',
+                      render: (p) => p.segmentos.reduce((s, x) => s + x.valor, 0),
+                    },
+                    ...(['Completada', 'En curso', 'Pendiente', 'Retrasada'] as const).map((e) => ({
+                      clave: e,
+                      titulo: e,
+                      alineacion: 'derecha' as const,
+                      render: (p: (typeof cargaEquipo)[number]) =>
+                        p.segmentos.find((s) => s.etiqueta === e)?.valor ?? 0,
+                    })),
+                  ]}
+                  filas={cargaEquipo}
+                  claveDe={(p) => p.id}
+                />
+              }
+            >
+              <CargaPersonas personas={cargaEquipo} />
+            </Figura>
+            <p className="hg-t-xs hg-t-sec" style={{ marginTop: 'var(--sp-md)' }}>
+              El avance del proyecto no dice si la carga esta repartida. Dos proyectos con el mismo avance, uno
+              con el trabajo concentrado en una persona y otro distribuido, tienen riesgos distintos.
+            </p>
+          </Card>
+
+          <div className="hg-grid hg-grid--2">
+            <Card titulo="Estado de vinculacion" subtitulo="Situacion contractual del grupo desarrollador.">
+              <Figura
+                tabla={
+                  <Table
+                    columnas={[
+                      { clave: 'estado', titulo: 'Estado', render: (r: { estado: string; n: number }) => r.estado },
+                      { clave: 'n', titulo: 'Personas', alineacion: 'derecha', render: (r) => r.n },
+                    ]}
+                    filas={Object.entries(resumen.equipo.porEstado).map(([estado, n]) => ({ estado, n }))}
+                    claveDe={(r) => r.estado}
+                  />
+                }
+              >
+                <Dona
+                  porciones={Object.entries(resumen.equipo.porEstado).map(([estado, n], i) => ({
+                    etiqueta: estado,
+                    valor: n,
+                    color: colorSerie(i),
+                  }))}
+                  etiquetaCentro="integrantes"
+                />
+              </Figura>
+            </Card>
+
+            <Card
+              titulo="Integridad de responsabilidades"
+              subtitulo="Actividades sin un responsable final unico (A) o sin ejecutor (R)."
+            >
+              {resumen.raci.filter((r) => !r.conforme).length === 0 ? (
+                <Vacio
+                  titulo="Matriz RACI completa"
+                  texto="Todas las actividades tienen exactamente un responsable final y al menos un ejecutor."
+                  icono={<IconCheck size={24} />}
+                />
+              ) : (
+                <Table
+                  columnas={[
+                    {
+                      clave: 'actividadNombre',
+                      titulo: 'Actividad',
+                      render: (r: (typeof resumen.raci)[number]) => (
+                        <span className="hg-t-sm">{r.actividadNombre}</span>
+                      ),
+                    },
+                    { clave: 'conteoA', titulo: 'A', alineacion: 'centro', render: (r) => r.conteoA },
+                    { clave: 'conteoR', titulo: 'R', alineacion: 'centro', render: (r) => r.conteoR },
+                    {
+                      clave: 'problema',
+                      titulo: 'Problema',
+                      render: (r) => (
+                        <span className="hg-t-xs" style={{ color: ESTADO.critico }}>
+                          {r.problema}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  filas={resumen.raci.filter((r) => !r.conforme).slice(0, 8)}
+                  claveDe={(r) => r.actividadId}
+                />
+              )}
+              <div className="hg-fila" style={{ marginTop: 'var(--sp-sm)' }}>
+                <Link to={`/proyectos/${proyecto.id}/raci`} className="hg-btn hg-btn--secondary hg-btn--sm">
+                  Ir a la matriz RACI
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/* Hitos                                                             */}
+      {/* ================================================================ */}
+      {vista === 'hitos' && (
+        <div className="hg-pila">
+          <div className="hg-grid hg-grid--kpi">
+            <KPICard etiqueta="Hitos registrados" valor={resumen.hitos.length} acento={colorSerie(0)} />
+            <KPICard
+              etiqueta="Cumplidos"
+              valor={hitos.cumplidos}
+              color={ESTADO.bueno}
+              pie={`${resumen.hitos.filter((h) => h.estado === 'Cumplido con retraso').length} con retraso`}
+              acento={ESTADO.bueno}
+            />
+            <KPICard
+              etiqueta="Vencidos"
+              valor={hitos.vencidos}
+              color={hitos.vencidos > 0 ? ESTADO.critico : ESTADO.bueno}
+              pie="Fecha programada superada sin cumplir"
+              acento={ESTADO.critico}
+            />
+            <KPICard
+              etiqueta="Condicionantes en riesgo"
+              valor={
+                resumen.hitos.filter((h) => h.condicionante && (h.vencido || h.estado === 'No cumplido')).length
+              }
+              color={
+                resumen.hitos.filter((h) => h.condicionante && (h.vencido || h.estado === 'No cumplido'))
+                  .length > 0
+                  ? ESTADO.critico
+                  : ESTADO.bueno
+              }
+              pie="Su incumplimiento bloquea actividades posteriores"
+              acento={ESTADO.serio}
+              pista="Un hito condicionante no cumplido detiene el trabajo que depende de el: su retraso se propaga."
+            />
+          </div>
+
+          <Card
+            titulo="Linea de tiempo de hitos"
+            subtitulo="Los puntos de control sobre la vigencia del proyecto. La marca morada es la fecha de corte."
+          >
+            <Figura
+              leyenda={(['Cumplido', 'Cumplido con retraso', 'En curso', 'Pendiente', 'No cumplido'] as const).map(
+                (e) => ({ etiqueta: e, color: estadoColors.hito[e].fg }),
+              )}
+              tabla={
+                <Table
+                  anchoMinimo="760px"
+                  columnas={[
+                    {
+                      clave: 'descripcion',
+                      titulo: 'Hito',
+                      render: (h: (typeof resumen.hitos)[number]) => (
+                        <div>
+                          <span className="hg-t-sm">{h.descripcion}</span>
+                          {h.condicionante && (
+                            <Badge fg="#B45309" bg="#FEF3C7">
+                              condicionante
+                            </Badge>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      clave: 'fechaProgramada',
+                      titulo: 'Programado',
+                      render: (h) => formatearFecha(h.fechaProgramada),
+                    },
+                    { clave: 'fechaReal', titulo: 'Real', render: (h) => formatearFecha(h.fechaReal) },
+                    {
+                      clave: 'desviacionDias',
+                      titulo: 'Desviacion',
+                      alineacion: 'derecha',
+                      render: (h) =>
+                        h.desviacionDias == null ? '—' : `${h.desviacionDias > 0 ? '+' : ''}${h.desviacionDias} d`,
+                    },
+                    { clave: 'estado', titulo: 'Estado', render: (h) => <BadgeEstado familia="hito" valor={h.estado} /> },
+                  ]}
+                  filas={[...resumen.hitos].sort((a, b) =>
+                    (a.fechaProgramada ?? '').localeCompare(b.fechaProgramada ?? ''),
+                  )}
+                  claveDe={(h) => h.id}
+                />
+              }
+            >
+              <LineaHitos
+                hitos={hitosLinea}
+                fechaCorte={proyecto.fechaCorte}
+                desde={proyecto.fechaInicio}
+                hasta={proyecto.fechaEntregaFinal}
+                formatoFecha={(f) => formatearFecha(f)}
+              />
+            </Figura>
+          </Card>
+
+          <div className="hg-grid hg-grid--2">
+            <Card titulo="Reparto por estado" subtitulo="Situacion de los hitos del proyecto.">
+              <Figura
+                tabla={
+                  <Table
+                    columnas={[
+                      { clave: 'estado', titulo: 'Estado', render: (r: { estado: string; n: number }) => r.estado },
+                      { clave: 'n', titulo: 'Hitos', alineacion: 'derecha', render: (r) => r.n },
+                    ]}
+                    filas={(['Cumplido', 'Cumplido con retraso', 'En curso', 'Pendiente', 'No cumplido'] as const).map(
+                      (estado) => ({ estado, n: resumen.hitos.filter((h) => h.estado === estado).length }),
+                    )}
+                    claveDe={(r) => r.estado}
+                  />
+                }
+              >
+                <Dona
+                  porciones={(
+                    ['Cumplido', 'Cumplido con retraso', 'En curso', 'Pendiente', 'No cumplido'] as const
+                  ).map((estado) => ({
+                    etiqueta: estado,
+                    valor: resumen.hitos.filter((h) => h.estado === estado).length,
+                    color: estadoColors.hito[estado].fg,
+                  }))}
+                  etiquetaCentro="hitos"
+                />
+              </Figura>
+            </Card>
+
+            <Card titulo="Proximos y vencidos" subtitulo="Ordenados por fecha programada.">
+              <Table
+                columnas={[
+                  {
+                    clave: 'descripcion',
+                    titulo: 'Hito',
+                    render: (h: (typeof resumen.hitos)[number]) => (
+                      <span className="hg-t-sm">{h.descripcion}</span>
+                    ),
+                  },
+                  { clave: 'fecha', titulo: 'Programado', render: (h) => formatearFecha(h.fechaProgramada) },
+                  {
+                    clave: 'dias',
+                    titulo: 'Dias',
+                    alineacion: 'derecha',
+                    render: (h) =>
+                      h.diasParaVencer == null ? (
+                        '—'
+                      ) : (
+                        <span style={{ color: h.diasParaVencer < 0 ? ESTADO.critico : undefined, fontWeight: 600 }}>
+                          {h.diasParaVencer}
+                        </span>
+                      ),
+                  },
+                  { clave: 'estado', titulo: 'Estado', render: (h) => <BadgeEstado familia="hito" valor={h.estado} /> },
+                ]}
+                filas={resumen.hitos
+                  .filter((h) => !h.cumplido)
+                  .sort((a, b) => (a.fechaProgramada ?? '').localeCompare(b.fechaProgramada ?? ''))
+                  .slice(0, 8)}
+                claveDe={(h) => h.id}
+                claseFila={(h) => (h.vencido ? 'hg-fila--critica' : '')}
+                vacio="Todos los hitos estan cumplidos."
+              />
+            </Card>
+          </div>
         </div>
       )}
 

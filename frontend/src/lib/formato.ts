@@ -33,8 +33,12 @@ export function porcentaje(valor: number | null | undefined, decimales = 1): str
 }
 
 export function conSigno(valor: number, decimales = 1, sufijo = ''): string {
-  const s = valor > 0 ? '+' : ''
-  return `${s}${valor.toFixed(decimales)}${sufijo}`
+  const redondeado = Number(valor.toFixed(decimales))
+  // Un valor que redondea a cero no tiene signo. Sin esta guarda, -0,04 se
+  // imprime como "-0.0", que no es un numero que exista.
+  if (redondeado === 0) return `${(0).toFixed(decimales)}${sufijo}`
+  const s = redondeado > 0 ? '+' : ''
+  return `${s}${redondeado.toFixed(decimales)}${sufijo}`
 }
 
 export function iniciales(nombre: string): string {

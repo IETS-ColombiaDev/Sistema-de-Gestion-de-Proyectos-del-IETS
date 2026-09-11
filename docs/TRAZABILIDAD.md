@@ -33,7 +33,7 @@ Este documento responde dos preguntas de control: **qué del backlog está const
 | EP-22 · Dashboard de indicadores | Indicadores | `modules/indicadores/Indicadores.tsx` (categorías, tabla, histórico) | Construido |
 | EP-23 · Portafolio y reportería | Portafolio | `modules/portafolio/Portafolio.tsx`, `app/usePortafolio.ts`, `lib/exportar.ts` | Construido |
 | EP-24 · Importación y validación | Importar y exportar | `modules/importacion/Importacion.tsx` | Construido |
-| EP-25 · Estrategia de pruebas | — | 146 pruebas en `domain/__tests__/`, `data/__tests__/`, `auth/__tests__/` | Construido |
+| EP-25 · Estrategia de pruebas | — | 188 pruebas en `domain/__tests__/`, `data/__tests__/`, `auth/__tests__/` | Construido |
 | EP-26 · Seguridad | — | `firestore.rules`, `storage.rules`, cabeceras y CSP en `firebase.json` | Construido |
 | EP-27 · Desempeño | — | División de código por módulo, memoización del motor, virtualización del Gantt por rango | Construido |
 | EP-28 · Puesta en producción | — | `docs/DESPLIEGUE.md`, `firebase.json`, funciones programadas | Documentado |
@@ -94,13 +94,14 @@ mismos datos y se explica cada diferencia con su hallazgo asociado.
 
 ## 4. Cobertura de pruebas
 
-146 pruebas automatizadas:
+188 pruebas automatizadas:
 
 | Suite | Qué verifica |
 |---|---|
 | `domain/__tests__/fechas.test.ts` | Aritmética en UTC, días hábiles, festivos de Colombia con Ley Emiliani |
 | `domain/__tests__/reglas.test.ts` | RN-01 a RN-28, en los dos modos, incluidos los casos límite de cada hallazgo |
 | `domain/__tests__/indicadores.test.ts` | Los diez indicadores, el semáforo, "sin datos" y las diferencias entre modos |
+| `domain/__tests__/evm.test.ts` | Índices de valor ganado, proyección, identidad de la cascada, veredicto por cuadrante, sustitución del proveedor de costos |
 | `data/__tests__/repo.test.ts` | CRUD, baja lógica, restauración, auditoría campo a campo, lotes, catálogos |
 | `auth/__tests__/permisos.test.ts` | Matriz rol × acción, proyecto cerrado, visibilidad del portafolio |
 
@@ -114,10 +115,37 @@ Lo que estas pruebas fijan como contrato:
 - Una escritura sin cambios reales **no genera** evento de auditoría.
 - Un alta genera **un** evento resumido; una actualización, **uno por campo**.
 - Un ciclo en las dependencias **no cuelga** el cálculo: deja la holgura sin calcular y lo advierte.
+- La cascada de cierre **cuadra exactamente**: presupuesto + sobrecosto incurrido + desvío proyectado
+  del trabajo restante = proyección al cierre. Si no cuadra, es un error de signo, no de redondeo.
+- Sustituir el proveedor de costos **cambia las cifras y no cambia las pantallas**: la prueba
+  registra una fuente externa y verifica que el índice de costo se recalcula contra ella.
+- Sin instantáneas guardadas, la curva S entrega **un punto**, no una trayectoria inventada.
 
 ---
 
-## 5. Fuera del alcance de esta entrega
+## 5. Capa de decisión — más allá del backlog
+
+El backlog pedía migrar el instrumento. Esta capa responde a lo que el instrumento no resolvía:
+convertir avance y ejecución en un veredicto. No sustituye ninguna épica; se apoya en todas.
+
+| Pieza | Dónde | Qué aporta |
+|---|---|---|
+| Motor de valor ganado | `domain/evm.ts` | Índices de cronograma y costo, proyección al cierre, eficiencia requerida, cuadrante con veredicto y decisión |
+| Contrato de costos | `domain/costos.ts` | `ProveedorCostos` — punto único de conexión con la herramienta institucional de costos |
+| Costos y valor ganado | `modules/costos/Costos.tsx` | Cuatro vistas: valor, desglose, equipo y **fuente del costo** (qué hay hoy y qué habrá al conectar) |
+| Gráficos de decisión | `components/charts/avanzados.tsx` | Curva S, cascada, cuadrante, barras divergentes, Pareto, bullet, sparkline |
+| Gráficos de reparto | `components/charts/reparto.tsx` | Dona, barras agrupadas, linea de hitos, carga por persona, matriz persona x fase |
+| Personas del portafolio | `modules/portafolio/Portafolio.tsx` (pestana *Personas*) | Consolida a cada persona entre proyectos: donde participa, dedicacion sumada y trabajo retrasado |
+| Barra de filtros | `components/FiltroBarra.tsx` | Una fila que acota el tablero entero, con estado en la URL para compartir la vista. Presente en los cinco tableros |
+| Medida del lienzo | `lib/useLienzo.ts` | Los graficos se dibujan a escala 1:1 sobre el contenedor medido; la altura sale de un token compartido y no del ancho de la tarjeta |
+
+Las decisiones de diseño de esta capa —por qué la trayectoria no se estima, por qué el costo no se
+reparte por fase, por qué los filtros van arriba y no por tarjeta, y qué gana el sistema cuando
+llegue la herramienta de costos— están en [`VALOR_GANADO.md`](VALOR_GANADO.md).
+
+---
+
+## 6. Fuera del alcance de esta entrega
 
 | Punto | Motivo |
 |---|---|

@@ -104,13 +104,14 @@ export default function FiltroBarra({
       role="search"
     >
       <div className="hg-filtros__marca">
-        <IconFiltro size={15} />
-        <span className="hg-t-xs hg-t-bold">Filtros</span>
+        <IconFiltro size={16} />
+        <span className="hg-t-xs">Filtros</span>
         {activos.length > 0 && (
-          <Badge fg="#4F46E5" bg="#EEF2FF" titulo="Filtros aplicados a todos los graficos del tablero">
+          <Badge fg="#fff" bg="#4F46E5" titulo="Filtros aplicados a todos los graficos del tablero">
             {activos.length}
           </Badge>
         )}
+        <Pista texto="Un solo recorte para todo el tablero: al cambiar un filtro se recomponen todos los graficos y tablas de esta pantalla. La seleccion queda en la direccion, asi que la vista filtrada se puede compartir." />
       </div>
 
       <div className="hg-filtros__campos">

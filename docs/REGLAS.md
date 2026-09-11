@@ -268,3 +268,40 @@ lee como el efecto medible de una corrección, no como un error del sistema nuev
 
 Está en **Importar y exportar → Paridad de cálculos**, y es exportable a Excel para el acta de
 validación con el líder de cada proyecto migrado.
+
+---
+
+## Las reglas del valor ganado
+
+`domain/evm.ts` — no forman parte de RN-01..RN-28 porque no vienen del instrumento original: son la
+capa que convierte sus resultados en una decisión. Están probadas en `domain/__tests__/evm.test.ts`.
+
+| Magnitud | Cómo se calcula |
+|---|---|
+| Presupuesto base (BAC) | Presupuesto total de la Ficha; si no está, el programado del libro presupuestal |
+| Valor planeado (PV) | BAC × avance planeado a la fecha de corte, con el reparto por duración en días hábiles de `avancePlaneadoEnFecha` |
+| Valor ganado (EV) | BAC × avance real ponderado por duración |
+| Costo real (AC) | Ejecutado acumulado hasta la fecha de corte, leído del `ProveedorCostos` vigente |
+| Variación de cronograma | EV − PV · **Índice** EV / PV |
+| Variación de costo | EV − AC · **Índice** EV / AC |
+| Proyección al cierre (EAC) | AC + (BAC − EV) / índice de costo — supone que el desempeño observado continúa |
+| Falta por gastar (ETC) | EAC − AC |
+| Variación al cierre (VAC) | BAC − EAC · negativa = se cierra por encima del presupuesto |
+| Eficiencia requerida (TCPI) | (BAC − EV) / (BAC − AC) — el desempeño que habría que sostener para cerrar dentro del presupuesto |
+
+Reglas de presentación que el motor impone y la interfaz no puede saltarse:
+
+- **Un índice sin denominador es "sin datos", no cero.** Sin presupuesto no hay valor ganado; sin
+  costo registrado no hay índice de costo. El tablero lo dice y no dibuja la serie.
+- **Umbral único de 0,95** para clasificar cronograma y costo como favorable o desfavorable. Es el
+  mismo en los cinco cuadrantes y no se configura por tablero: si cambia, cambia en un solo lugar.
+- **TCPI por encima de 1,10 se declara no alcanzable.** El veredicto deja de pedir eficiencia y pasa
+  a pedir decisión: replanificar alcance o aprobar presupuesto adicional.
+- **Cuando el presupuesto ya se agotó** (AC ≥ BAC) la eficiencia requerida no tiene sentido
+  matemático; el motor lo marca como salvedad en lugar de imprimir un número absurdo.
+- **Las salvedades viajan con el resultado**, no en una nota al pie: falta de presupuesto, ausencia
+  de costo, presupuesto agotado, falta de instantáneas y ausencia de comprometido en el libro.
+- **La cascada cuadra o es un defecto.** BAC + (AC − EV) + (ETC − (BAC − EV)) = EAC, con el signo
+  positivo siempre significando *encarece*. Hay una prueba que lo verifica como identidad exacta.
+- **El costo no se reparte por fase.** El desglose por fase muestra índice de cronograma y declara
+  por qué no muestra índice de costo: el libro se lleva por rubro y periodo, no por fase.

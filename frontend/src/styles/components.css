@@ -896,15 +896,47 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 .hg-grid--2 {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  /* Las tarjetas de contenido se ajustan a su alto: estirarlas para igualar a
-     la vecina mas alta deja huecos en blanco que no comunican nada. La fila de
-     KPI si conserva el estirado, porque ahi la simetria es la lectura. */
-  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 .hg-grid--3 {
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Filas parejas.
+   Antes estas rejillas llevaban `align-items: start`, con el argumento de que
+   estirar una tarjeta baja hasta la altura de su vecina dejaba un hueco en
+   blanco. El argumento estaba equivocado: la altura de la fila la fija la
+   tarjeta mas alta, asi que el hueco existe de todas formas; con `start`
+   simplemente queda FUERA del borde, y se lee como un error de maquetacion.
+   Se median 290 px de vacio en el dashboard y 322 px en costos.
+
+   La solucion no es elegir entre start y stretch, sino que el contenido llene:
+   la tarjeta se estira, se vuelve columna flexible, y el grafico que lleva
+   dentro toma la altura sobrante. */
+.hg-grid--2 > .hg-card,
+.hg-grid--3 > .hg-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* El area de grafico crece hasta llenar la tarjeta. Se aplica al contenedor
+   medido por `useLienzo`, que ya se declara flexible cuando no recibe altura
+   fija; esto le da algo que llenar. */
+/* El cuerpo de la tarjeta y la figura que lleva dentro crecen juntos, de modo
+   que el grafico llega hasta el borde inferior. */
+.hg-card__cuerpo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.hg-card__cuerpo > figure {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .hg-grid--form {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1279,10 +1311,13 @@
   align-items: flex-end;
   gap: var(--sp-md);
   flex-wrap: wrap;
-  background: var(--c-bg-card);
+  /* Fondo tenue de marca y borde izquierdo grueso: la barra tiene que leerse
+     como un control, no como otra tarjeta de contenido. */
+  background: linear-gradient(180deg, #f7f8ff 0%, var(--c-bg-card) 60%);
   border: 1px solid var(--c-border);
+  border-left: 4px solid var(--c-purple);
   border-radius: var(--r-lg);
-  padding: var(--sp-sm) var(--sp-md);
+  padding: var(--sp-sm) var(--sp-md) var(--sp-sm) var(--sp-sm);
   position: sticky;
   top: var(--header-h);
   z-index: 30;
@@ -1292,10 +1327,15 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--c-text-2);
+  color: var(--c-purple);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding-bottom: 9px;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  padding: 0 var(--sp-sm) 9px 0;
+  margin-right: var(--sp-xs);
+  border-right: 1px solid var(--c-border);
+  align-self: stretch;
+  align-items: flex-end;
   flex: none;
 }
 .hg-filtros__campos {
@@ -1376,4 +1416,200 @@
   .hg-veredicto__titulo {
     font-size: var(--fs-md);
   }
+}
+
+/* ----------------------------------------------------- Medidor de indicador
+   Una fila por indicador: codigo y nombre, la barra contra su propia meta, el
+   resultado y la meta. Cada indicador conserva su escala, de modo que un
+   porcentaje y un recuento no acaban en el mismo eje. */
+.hg-medidor {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 2fr) auto auto;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--c-border-suave, #F1F5F9);
+}
+.hg-medidor:last-child {
+  border-bottom: 0;
+}
+.hg-medidor__rotulo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.hg-medidor__rotulo > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg-medidor__barra {
+  min-width: 0;
+}
+.hg-medidor__cifra {
+  min-width: 64px;
+  text-align: right;
+}
+.hg-medidor__meta {
+  min-width: 68px;
+  text-align: right;
+}
+
+/* En pantalla angosta la fila se apila: el rotulo arriba, la barra a lo ancho
+   y las cifras en una linea. Comprimir cuatro columnas en 360 px dejaria la
+   barra sin espacio util, que es justo lo que se quiere leer. */
+@media (max-width: 700px) {
+  .hg-medidor {
+    grid-template-columns: 1fr auto;
+    row-gap: 4px;
+  }
+  .hg-medidor__barra {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+  .hg-medidor__cifra {
+    text-align: right;
+  }
+  .hg-medidor__meta {
+    grid-column: 1 / -1;
+    order: 4;
+    text-align: left;
+  }
+}
+
+/* ------------------------------------------------- Matriz de asignacion
+   Personas contra fases: donde esta cada quien. La celda vacia queda en
+   blanco a proposito, para que el patron de ocupacion se lea sin estorbo. */
+.hg-matriz__tabla {
+  border-collapse: separate;
+  border-spacing: 3px;
+  width: 100%;
+  min-width: 520px;
+}
+.hg-matriz__esquina,
+.hg-matriz__cabecera,
+.hg-matriz__total {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+  vertical-align: bottom;
+  padding: 0 2px 4px;
+}
+.hg-matriz__esquina {
+  text-align: left;
+}
+.hg-matriz__cabecera span {
+  display: block;
+  max-width: 96px;
+  margin: 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg-matriz__persona {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  font-weight: 400;
+  min-width: 150px;
+  max-width: 220px;
+  padding-right: var(--sp-sm);
+}
+.hg-matriz__persona > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg-matriz__celda {
+  padding: 0;
+  text-align: center;
+}
+/* Area de toque de 28px: por debajo de eso la casilla no se puede pulsar con
+   fiabilidad en una pantalla tactil. */
+.hg-matriz__marca {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--r-base);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+.hg-matriz__marca:disabled {
+  cursor: default;
+}
+.hg-matriz__marca:not(:disabled):hover {
+  transform: scale(1.08);
+  box-shadow: var(--sh-sm);
+}
+.hg-matriz__marca:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+/* El retraso va como marca aparte: el color del semaforo no se mezcla con la
+   rampa de intensidad, que mide cantidad y no estado. */
+.hg-matriz__aviso {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-danger, #DC2626);
+  box-shadow: 0 0 0 1.5px var(--c-bg-card);
+}
+.hg-matriz__vacia {
+  display: block;
+  height: 30px;
+  border-radius: var(--r-base);
+  border: 1px dashed var(--c-border);
+  opacity: 0.5;
+}
+
+/* --------------------------------------------- Etiqueta-enlace de proyecto
+   Ficha compacta para listar los proyectos en los que participa una persona.
+   Area de toque de 26px de alto: son enlaces reales, no adornos. */
+.hg-etiqueta-enlace {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-full);
+  background: var(--c-bg-hover);
+  color: var(--c-text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.hg-etiqueta-enlace:hover {
+  background: var(--c-primary-suave, #EEF2FF);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+.hg-etiqueta-enlace:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+.hg-etiqueta-enlace__aviso {
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--c-danger, #DC2626);
 }

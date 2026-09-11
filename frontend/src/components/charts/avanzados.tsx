@@ -20,6 +20,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import { DIVERGENTE, SERIE_EVM, TINTA, tintaSobre, tonoDivergente } from './paleta'
 import { SECUENCIAL_INDIGO } from './paleta'
+import { fuente, useLienzo } from '../../lib/useLienzo'
 
 // ---------------------------------------------------------------------------
 // Utilidades compartidas
@@ -28,14 +29,11 @@ import { SECUENCIAL_INDIGO } from './paleta'
 const MARGEN = { arriba: 16, derecha: 18, abajo: 30, izquierda: 62 }
 
 /**
- * Factor de escala del texto dentro del SVG.
- *
- * El grafico se dibuja en un lienzo de ancho fijo y se escala por CSS al ancho
- * disponible. En un telefono ese factor ronda 0,55, de modo que un texto de
- * 10 unidades acaba en 5,5 px: ilegible. En modo compacto el texto se dibuja
- * mas grande para que en pantalla siga midiendo lo mismo.
+ * El lienzo se mide y se dibuja 1:1 (ver `lib/useLienzo`), asi que el tamano
+ * de fuente que se pide es el que se ve. `fs` solo aplica el piso de
+ * legibilidad; en lienzos angostos se quitan marcas, nunca se encoge el texto.
  */
-const ESCALA_COMPACTA = 1.85
+const fs = fuente
 
 function Globo({ x, y, children }: { x: number; y: number; children: ReactNode }) {
   return (
@@ -99,20 +97,16 @@ export function CurvaS({
   puntos,
   formato,
   presupuesto,
-  alto = 300,
-  compacto = false,
+  alto,
 }: {
   puntos: PuntoCurvaS[]
   formato: (n: number) => string
   /** Linea de referencia del presupuesto aprobado. */
   presupuesto?: number
   alto?: number
-  /** Pantalla estrecha: texto mas grande y menos marcas en los ejes. */
-  compacto?: boolean
 }) {
   const [hover, setHover] = useState<{ i: number; x: number } | null>(null)
-  const esc = compacto ? ESCALA_COMPACTA : 1
-  const fs = (base: number) => Math.round(base * esc)
+  const { ref, W, H, listo, denso, estilo, estiloSvg } = useLienzo(alto)
 
   if (puntos.length < 2) {
     return <p className="hg-t-sm hg-t-sec">Se necesitan al menos dos periodos para trazar la curva.</p>
@@ -122,13 +116,7 @@ export function CurvaS({
     [p.planeado, p.ganado, p.real, p.proyectado].filter((v): v is number => v != null),
   )
   const maxY = techoLegible(Math.max(...valores, presupuesto ?? 0))
-  const W = 760
-  const H = alto
-  // En modo compacto los margenes crecen con el texto: si no, las etiquetas del
-  // eje se salen del lienzo.
-  const M = compacto
-    ? { arriba: 26, derecha: 24, abajo: 46, izquierda: 96 }
-    : MARGEN
+  const M = MARGEN
   const anchoUtil = W - M.izquierda - M.derecha
   const altoUtil = H - M.arriba - M.abajo
 
@@ -154,10 +142,13 @@ export function CurvaS({
   ]
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div ref={ref} style={estilo}>
+      {listo && (
       <svg
+        width={W}
+        height={H}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+        style={estiloSvg}
         role="img"
         aria-label="Curva de valor planeado, valor ganado y costo real en el tiempo, con la proyeccion de cierre"
         onMouseLeave={() => setHover(null)}
@@ -201,12 +192,15 @@ export function CurvaS({
               stroke={TINTA.primaria}
               strokeWidth={1.5}
             />
-            {!compacto && (
+            {/* El rotulo va al extremo izquierdo: en el derecho chocaria con la
+                etiqueta directa del extremo de la proyeccion, que es la cifra
+                que el lector busca. */}
+            {!denso && (
               <text
-                x={W - M.derecha}
+                x={M.izquierda + 6}
                 y={py(presupuesto) - 6}
-                textAnchor="end"
-                fontSize={10}
+                textAnchor="start"
+                fontSize={fs(10)}
                 fontWeight={700}
                 fill={TINTA.primaria}
               >
@@ -216,9 +210,11 @@ export function CurvaS({
           </g>
         )}
 
-        {/* Eje temporal */}
+        {/* Eje temporal. Cuantas marcas caben es una division, no una
+            suposicion: un rotulo "26-04" mide unos 34 px a 11 px de fuente y
+            necesita 16 px de aire para no tocar al vecino. */}
         {puntos.map((p, i) => {
-          const paso = Math.ceil(puntos.length / (compacto ? 4 : 9))
+          const paso = Math.ceil(puntos.length / Math.max(2, Math.floor(anchoUtil / 50)))
           if (i % paso !== 0 && i !== puntos.length - 1) return null
           return (
             <text key={p.periodo} x={px(i)} y={H - 10} textAnchor="middle" fontSize={fs(10)} fill={TINTA.tenue}>
@@ -320,13 +316,11 @@ export function CurvaS({
             width={Math.max(24, anchoUtil / puntos.length)}
             height={altoUtil}
             fill="transparent"
-            onMouseEnter={(e) => {
-              const caja = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect()
-              setHover({ i, x: (px(i) / W) * caja.width })
-            }}
+            onMouseEnter={() => setHover({ i, x: px(i) })}
           />
         ))}
       </svg>
+      )}
 
       {hover && (
         <Globo x={hover.x} y={M.arriba}>
@@ -379,16 +373,14 @@ export interface PasoCascadaVista {
 export function Cascada({
   pasos,
   formato,
-  alto = 260,
-  compacto = false,
+  alto,
 }: {
   pasos: PasoCascadaVista[]
   formato: (n: number) => string
   alto?: number
-  compacto?: boolean
 }) {
   const [hover, setHover] = useState<number | null>(null)
-  const fs = (base: number) => Math.round(base * (compacto ? ESCALA_COMPACTA : 1))
+  const { ref, W, H, listo, estilo, estiloSvg } = useLienzo(alto)
 
   if (pasos.length === 0) {
     return <p className="hg-t-sm hg-t-sec">Sin datos suficientes para descomponer la variacion.</p>
@@ -407,8 +399,6 @@ export function Cascada({
   })
 
   const maxY = techoLegible(Math.max(...barras.flatMap((b) => [b.desde, b.hasta])))
-  const W = 700
-  const H = alto
   const anchoUtil = W - MARGEN.izquierda - MARGEN.derecha
   const altoUtil = H - MARGEN.arriba - 46
   const anchoBarra = Math.min(96, (anchoUtil / barras.length) * 0.62)
@@ -416,10 +406,13 @@ export function Cascada({
   const py = (v: number) => MARGEN.arriba + altoUtil - (v / maxY) * altoUtil
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div ref={ref} style={estilo}>
+      {listo && (
       <svg
+        width={W}
+        height={H}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+        style={estiloSvg}
         role="img"
         aria-label={`Descomposicion: ${pasos.map((p) => `${p.etiqueta} ${formato(p.valor)}`).join('; ')}`}
         onMouseLeave={() => setHover(null)}
@@ -501,6 +494,7 @@ export function Cascada({
           )
         })}
       </svg>
+      )}
 
       {hover != null && pasos[hover].explicacion && (
         <p className="hg-t-xs hg-t-sec" style={{ marginTop: 'var(--sp-xs)' }}>
@@ -542,21 +536,19 @@ export interface PuntoCuadrante {
 export function Cuadrante({
   puntos,
   onPunto,
-  alto = 340,
+  alto,
   etiquetaX = 'Indice de cronograma',
   etiquetaY = 'Indice de costo',
-  compacto = false,
 }: {
   puntos: PuntoCuadrante[]
   onPunto?: (id: string) => void
   alto?: number
   etiquetaX?: string
   etiquetaY?: string
-  compacto?: boolean
 }) {
   const [hover, setHover] = useState<{ p: PuntoCuadrante; x: number; y: number } | null>(null)
   const idGrad = useId()
-  const fs = (base: number) => Math.round(base * (compacto ? ESCALA_COMPACTA : 1))
+  const { ref, W, H, listo, denso, estilo, estiloSvg } = useLienzo(alto)
 
   if (puntos.length === 0) {
     return <p className="hg-t-sm hg-t-sec">Sin proyectos con indices calculables.</p>
@@ -570,10 +562,8 @@ export function Cuadrante({
   const min = Math.max(0, 1 - desvio * 1.15)
   const max = 1 + desvio * 1.15
 
-  const W = 620
-  const H = alto
-  const M = compacto
-    ? { arriba: 30, derecha: 30, abajo: 78, izquierda: 84 }
+  const M = denso
+    ? { arriba: 20, derecha: 20, abajo: 58, izquierda: 52 }
     : { arriba: 22, derecha: 26, abajo: 52, izquierda: 58 }
   const anchoUtil = W - M.izquierda - M.derecha
   const altoUtil = H - M.arriba - M.abajo
@@ -611,24 +601,27 @@ export function Cuadrante({
     {
       nombre: 'Al dia, sobre costo',
       x: px(max) - SANGRIA,
-      y: M.arriba + altoUtil - 8,
+      y: M.arriba + altoUtil - 10,
       ancla: 'end' as const,
       tono: '#FFF7ED',
     },
     {
       nombre: 'Atrasado y sobre costo',
       x: M.izquierda + SANGRIA,
-      y: M.arriba + altoUtil - 8,
+      y: M.arriba + altoUtil - 10,
       ancla: 'start' as const,
       tono: '#FEF2F2',
     },
   ]
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div ref={ref} style={estilo}>
+      {listo && (
       <svg
+        width={W}
+        height={H}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+        style={estiloSvg}
         role="img"
         aria-label={`Dispersion de ${puntos.length} proyectos por indice de cronograma e indice de costo`}
         onMouseLeave={() => setHover(null)}
@@ -667,14 +660,25 @@ export function Cuadrante({
         ))}
 
         {/* Escalas */}
-        {[min, 1, max].map((v) => (
+        {[min, 1, max].map((v, i) => (
           <g key={`x${v}`}>
-            <text x={px(v)} y={M.arriba + altoUtil + 16} textAnchor="middle" fontSize={fs(10)} fill={TINTA.tenue}>
+            <text
+              x={px(v)}
+              y={M.arriba + altoUtil + fs(15)}
+              textAnchor="middle"
+              fontSize={fs(10)}
+              fill={TINTA.tenue}
+            >
               {v.toFixed(2)}
             </text>
-            <text x={M.izquierda - 8} y={py(v) + 4} textAnchor="end" fontSize={fs(10)} fill={TINTA.tenue}>
-              {v.toFixed(2)}
-            </text>
+            {/* La marca minima del eje vertical coincide en la esquina con la
+                del horizontal: se omite para no imprimir dos veces la misma
+                cifra a un centimetro de distancia. */}
+            {i > 0 && (
+              <text x={M.izquierda - 8} y={py(v) + 4} textAnchor="end" fontSize={fs(10)} fill={TINTA.tenue}>
+                {v.toFixed(2)}
+              </text>
+            )}
           </g>
         ))}
         <text
@@ -759,6 +763,7 @@ export function Cuadrante({
             )
           })}
       </svg>
+      )}
 
       {hover && (
         <Globo x={hover.x} y={hover.y}>
@@ -909,24 +914,18 @@ export interface LineaParetoVista {
 export function Pareto({
   lineas,
   formato,
-  alto = 260,
-  compacto = false,
+  alto,
 }: {
   lineas: LineaParetoVista[]
   formato: (n: number) => string
   alto?: number
-  compacto?: boolean
 }) {
   const [hover, setHover] = useState<number | null>(null)
-  const fs = (base: number) => Math.round(base * (compacto ? ESCALA_COMPACTA : 1))
+  const { ref, W, H, listo, estilo, estiloSvg } = useLienzo(alto)
 
   if (lineas.length === 0) return <p className="hg-t-sm hg-t-sec">Sin gasto registrado.</p>
 
-  const W = 700
-  const H = alto
-  const M = compacto
-    ? { arriba: 20, derecha: 22, abajo: 84, izquierda: 74 }
-    : { arriba: 16, derecha: 18, abajo: 52, izquierda: 46 }
+  const M = { arriba: 16, derecha: 18, abajo: 52, izquierda: 46 }
   const anchoUtil = W - M.izquierda - M.derecha
   const altoUtil = H - M.arriba - M.abajo
   const anchoBanda = anchoUtil / lineas.length
@@ -937,10 +936,13 @@ export function Pareto({
   const nucleo = lineas.filter((l) => l.enElNucleo).length
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div ref={ref} style={estilo}>
+      {listo && (
       <svg
+        width={W}
+        height={H}
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+        style={estiloSvg}
         role="img"
         aria-label={`Concentracion del gasto: ${nucleo} de ${lineas.length} lineas explican el 80 % del total`}
         onMouseLeave={() => setHover(null)}
@@ -1040,6 +1042,7 @@ export function Pareto({
           />
         ))}
       </svg>
+      )}
 
       {hover != null && (
         <p className="hg-t-xs hg-t-sec" style={{ marginTop: 'var(--sp-xs)' }}>

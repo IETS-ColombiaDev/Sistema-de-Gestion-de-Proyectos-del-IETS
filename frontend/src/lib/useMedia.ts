@@ -23,3 +23,4 @@ export function useMedia(consulta: string): boolean {
 
 export const esMovil = '(max-width: 640px)'
 export const esTableta = '(max-width: 1023px)'
+

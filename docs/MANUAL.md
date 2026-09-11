@@ -76,6 +76,83 @@ cifras exactas.
 
 ---
 
+## Cómo leer el bloque de valor ganado
+
+Arriba del Dashboard ejecutivo hay un bloque con un título, una frase y una decisión. No es un
+resumen decorativo: es la lectura conjunta de cronograma y costo, y dice qué está sobre la mesa.
+
+**Índice de cronograma** — Del trabajo que debería estar hecho, cuánto está hecho. Por debajo de
+0,95 el proyecto va atrasado.
+
+**Índice de costo** — Por cada peso gastado, cuánto trabajo se obtuvo. Por debajo de 0,95 el trabajo
+está saliendo más caro de lo previsto.
+
+**Proyección al cierre** — Con qué cifra se cierra si el desempeño observado continúa. La
+**variación al cierre** es la diferencia contra el presupuesto: negativa significa que se cierra por
+encima.
+
+**Eficiencia requerida** — Qué desempeño habría que sostener en lo que falta para cerrar dentro del
+presupuesto. Por encima de 1,10 el tablero lo declara no alcanzable, y entonces la conversación deja
+de ser sobre esfuerzo y pasa a ser sobre alcance o presupuesto adicional.
+
+Dos advertencias de lectura:
+
+- **Un índice puede decir "sin datos".** Sin presupuesto en la Ficha no hay valor ganado, y sin
+  control presupuestal registrado no hay índice de costo. El sistema nunca muestra cero en su lugar.
+- **La trayectoria de la curva S viene de las instantáneas guardadas.** Si no se han guardado cortes
+  anteriores, la curva muestra un punto y lo dice. Guardar una instantánea en cada corte es lo que
+  construye el histórico; nadie puede reconstruirlo después.
+
+El tablero enumera sus propias **salvedades** —presupuesto ausente, presupuesto agotado, falta de
+instantáneas, compromisos no disponibles en el libro— antes de que alguien decida sobre esas cifras.
+
+---
+
+## Ver quién está en qué
+
+En el **Dashboard ejecutivo → Equipo** hay dos lecturas distintas y complementarias:
+
+*Quiénes conforman el equipo* es la nómina: cada persona con su perfil, su vinculación, su dedicación
+y **la actividad en la que está ahora**, con la fase y el estado de esa actividad. Los perfiles sin
+designar aparecen en la lista marcados como tales.
+
+*Dónde está el equipo* pone a las personas contra las fases. Sirve para una pregunta que la lista no
+responde: si el equipo está amontonado en una fase y ausente de la siguiente. El punto rojo en una
+casilla indica que ahí hay trabajo retrasado.
+
+En el **Portafolio → Personas** se ve lo que ninguna ficha de proyecto muestra: quién participa en
+varios proyectos a la vez y cuánta dedicación suma entre todos. Si alguien pasa de una jornada al
+sumar sus frentes, la cifra se resalta. La dedicación es la **declarada** en cada ficha, no horas
+trabajadas: el sistema no registra tiempo ejecutado.
+
+---
+
+## Filtros
+
+Cada tablero tiene **una sola fila de filtros** arriba, y acota todo lo que hay debajo: si se filtra
+por una fase, todas las tarjetas y todos los gráficos muestran esa fase. No hay filtros por tarjeta,
+justamente para que dos gráficos contiguos nunca puedan mostrar cortes distintos de los datos.
+
+Los filtros quedan **en la dirección web**. Eso significa que una vista filtrada se puede copiar y
+enviar: quien la abra ve exactamente el mismo tablero, sin instrucciones. El botón *Limpiar* vuelve
+a la vista completa.
+
+En el **Tablero de seguimiento** el filtro acota las actividades, el avance por fase, los retrasos y
+los vencimientos. Las cuatro cifras de la cabecera —avance ponderado, esperado, desviación y avance
+simple— son del proyecto completo y no cambian con el filtro; cuando hay uno activo, el tablero lo
+dice sobre la fila.
+
+En **Indicadores**, el filtro de *cumplimiento* deja a la vista solo los que no alcanzan su meta.
+Cada indicador se muestra en su propia barra, con su meta marcada: no se comparan entre sí en una
+escala común, porque unos se miden en porcentaje y otros en número, y en unos conviene el valor alto
+y en otros el bajo.
+
+En el Portafolio, el filtro de **desempeño** usa los cuadrantes del valor ganado. Las alertas del
+tipo *"3 proyectos proyectan cerrar por encima de su presupuesto"* traen un botón que aplica ese
+filtro y deja el tablero mostrando únicamente esos proyectos.
+
+---
+
 ## Importar desde el libro Excel
 
 **Importar y exportar → Importar.** El importador reconoce hojas cuyo nombre contenga *Cronograma*,

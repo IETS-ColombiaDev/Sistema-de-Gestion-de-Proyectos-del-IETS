@@ -26,6 +26,12 @@ motor opera en dos modos —`saneado` y `compatibilidad`— y el módulo *Import
 una **prueba de paridad** que compara ambos y explica cada diferencia, hallazgo por hallazgo. Esa
 es la respuesta al riesgo RD-11: el saneamiento nunca se confunde con un error de cálculo.
 
+Y va más allá del instrumento original: incorpora un **motor de valor ganado** que convierte
+"avance 53 %, ejecutado $265 M" en un veredicto y una decisión —*"recuperar el presupuesto exigiría
+una eficiencia de 2,14 en el trabajo restante, que no es alcanzable; la decisión es replanificar
+alcance o aprobar presupuesto adicional"*—, con una capa de costos preparada para conectarse a la
+herramienta institucional mediante un solo contrato. Ver [`docs/VALOR_GANADO.md`](docs/VALOR_GANADO.md).
+
 ---
 
 ## Puesta en marcha
@@ -79,6 +85,8 @@ frontend/src/
 │   ├── fechas.ts        Aritmética en UTC, días hábiles, festivos de Colombia
 │   ├── reglas.ts        RN-01 a RN-28, en los dos modos de cálculo
 │   ├── indicadores.ts   Catálogo declarativo y motor de los diez indicadores
+│   ├── evm.ts           Valor ganado: índices, proyección, veredicto y decisión
+│   ├── costos.ts        Contrato ProveedorCostos — punto de conexión externo
 │   ├── alertas.ts       Centro de alertas unificado
 │   └── catalogos.ts     Listas y parámetros por defecto
 ├── data/            Persistencia tras un solo contrato
@@ -89,7 +97,16 @@ frontend/src/
 │   └── auditoria.ts     Diferencias campo a campo y campos sensibles
 ├── auth/            Sesión y matriz de permisos rol × acción
 ├── components/      Sistema de diseño (un botón, un campo, una tabla)
-├── modules/         Los 18 módulos funcionales
+│   ├── charts/          Gráficos en SVG, sin librería de terceros
+│   │   ├── paleta.ts        Paletas verificadas para daltonismo
+│   │   ├── avanzados.tsx    Curva S, cascada, cuadrante, Pareto, bullet, sparkline
+│   │   ├── reparto.tsx      Dona, barras agrupadas, línea de hitos, carga por persona
+│   │   └── index.tsx        Figura con leyenda y su tabla gemela
+│   ├── FiltroBarra.tsx  Filtros de tablero, con estado en la URL
+│   └── ui/              Modal, tabla, formulario, avisos
+├── lib/             useLienzo.ts — medida del lienzo y escala de alturas
+│                    useMedia.ts — puntos de quiebre compartidos
+├── modules/         Los módulos funcionales, incluido costos/
 └── styles/          theme.ts — fuente única de los design tokens
 ```
 
@@ -100,6 +117,16 @@ suite de pruebas.
 
 **La capa de datos vive tras un contrato.** La aplicación habla con `Adaptador`, nunca con
 Firestore ni con IndexedDB. Cambiar de backend es cambiar una variable de entorno.
+
+**El costo también vive tras un contrato.** Ningún tablero lee el libro presupuestal directamente:
+todos pasan por `ProveedorCostos`. Conectar la herramienta institucional de costos es registrar otro
+proveedor —una línea al arrancar la aplicación— sin tocar pantallas, cálculos ni pruebas. Ver
+[`docs/VALOR_GANADO.md`](docs/VALOR_GANADO.md).
+
+**Los gráficos no traen librería.** Son SVG propio: sin dependencia externa que auditar ni que
+actualizar, con la paleta verificada por script y una tabla equivalente detrás de cada figura. El
+lienzo se mide y se dibuja a escala 1:1, de modo que la altura de un gráfico es una decisión de
+diseño y no una consecuencia del ancho de su tarjeta.
 
 ### Decisiones de arquitectura
 
@@ -118,7 +145,7 @@ Las diez decisiones (ADR-01 a ADR-10) están en el backlog. Las que más se nota
 
 ## Cobertura funcional
 
-Los 18 módulos de las 17 hojas del instrumento, más lo que el archivo no podía dar:
+Los 19 módulos de las 17 hojas del instrumento, más lo que el archivo no podía dar:
 
 **Institucional** — Portafolio consolidado · Listado de proyectos · Auditoría del sistema
 **Administración** — Catálogos y parámetros · Catálogo de indicadores · Usuarios y roles
@@ -126,7 +153,7 @@ Los 18 módulos de las 17 hojas del instrumento, más lo que el archivo no podí
 **Planeación** — Cronograma · Diagrama de Gantt · Hitos y ruta crítica
 **Gobierno y control** — Matriz RACI · Matriz de riesgos · Recursos e insumos
 **Medición** — Registro de productos · Satisfacción · Control presupuestal · Indicadores
-**Lectura gerencial** — Dashboard ejecutivo · Tablero de seguimiento
+**Lectura gerencial** — Dashboard ejecutivo · Tablero de seguimiento · Costos y valor ganado
 **Trazabilidad** — Auditoría del proyecto · Importar, exportar y prueba de paridad
 
 El detalle épica por épica está en [`docs/TRAZABILIDAD.md`](docs/TRAZABILIDAD.md).
@@ -156,6 +183,7 @@ despliegue y por el gestor de secretos de la plataforma.
 |---|---|
 | [`docs/TRAZABILIDAD.md`](docs/TRAZABILIDAD.md) | Épica → módulo → archivo → prueba, y estado de cada hallazgo del Anexo C |
 | [`docs/REGLAS.md`](docs/REGLAS.md) | Las 28 reglas de negocio, su implementación y su prueba |
+| [`docs/VALOR_GANADO.md`](docs/VALOR_GANADO.md) | Motor de valor ganado, tableros de decisión y conexión con la herramienta de costos |
 | [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) | Entornos, secretos, reglas de seguridad, puesta en producción |
 | [`docs/MANUAL.md`](docs/MANUAL.md) | Rutina semanal por rol |
 | `HIGEP_Web_Backlog_Tecnologico.md` | Backlog de origen |
