@@ -511,6 +511,10 @@
   padding: var(--sp-xl);
   overflow-y: auto;
   flex: 1;
+  /* min-height:0 es lo que permite al cuerpo encogerse por debajo de su
+     contenido: sin esto el modal crece mas alla de su max-height y la cabecera
+     queda cortada por encima del borde de la ventana. */
+  min-height: 0;
 }
 .hg-modal__pie {
   display: flex;
@@ -893,9 +897,14 @@
 }
 .hg-grid--2 {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* Las tarjetas de contenido se ajustan a su alto: estirarlas para igualar a
+     la vecina mas alta deja huecos en blanco que no comunican nada. La fila de
+     KPI si conserva el estirado, porque ahi la simetria es la lectura. */
+  align-items: start;
 }
 .hg-grid--3 {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: start;
 }
 .hg-grid--form {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1008,5 +1017,363 @@
   }
   .hg-btn--md {
     min-height: 40px;
+  }
+}
+
+/* ==========================================================================
+   Vista de tabla en movil
+   Bajo 640px la tabla se reorganiza como lista de tarjetas: cada celda muestra
+   su etiqueta de columna delante del valor. Es la unica forma de leer un
+   listado denso en un telefono sin desplazamiento horizontal permanente.
+   Se aplica solo a .hg-tabla--responsiva; las matrices (RACI, permisos) y el
+   Gantt conservan el desplazamiento, porque su lectura es bidimensional.
+   ========================================================================== */
+@media (max-width: 640px) {
+  .hg-tabla-wrap:has(.hg-tabla--responsiva) {
+    border: none;
+    background: transparent;
+    overflow-x: visible;
+  }
+
+  .hg-tabla--responsiva thead {
+    display: none;
+  }
+
+  .hg-tabla--responsiva,
+  .hg-tabla--responsiva tbody,
+  .hg-tabla--responsiva tr,
+  .hg-tabla--responsiva td {
+    display: block;
+    width: 100%;
+  }
+
+  .hg-tabla--responsiva tbody tr {
+    background: var(--c-bg-card);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    padding: var(--sp-xs) var(--sp-sm);
+    margin-bottom: var(--sp-xs);
+  }
+  .hg-tabla--responsiva tbody tr:hover {
+    background: var(--c-bg-card);
+  }
+  .hg-tabla--responsiva tbody tr.hg-fila--critica {
+    border-left: 3px solid var(--c-error);
+  }
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo {
+    background: var(--c-bg-active);
+    font-weight: 600;
+  }
+
+  .hg-tabla--responsiva tbody td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-sm);
+    border: none;
+    border-bottom: 1px solid var(--c-border);
+    padding: 7px 0;
+    text-align: left !important;
+  }
+  .hg-tabla--responsiva tbody td:last-child {
+    border-bottom: none;
+  }
+  /* Una celda sin etiqueta (columna de acciones) ocupa toda la fila. */
+  .hg-tabla--responsiva tbody td:not([data-etiqueta]) {
+    justify-content: flex-end;
+  }
+  .hg-tabla--responsiva tbody td[data-etiqueta]::before {
+    content: attr(data-etiqueta);
+    flex: none;
+    max-width: 45%;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--c-text-3);
+  }
+  .hg-tabla--responsiva tbody td > * {
+    min-width: 0;
+  }
+  /* La celda vacia y el pie de totales no se convierten en tarjeta. */
+  .hg-tabla--responsiva tbody tr.hg-tabla__vacia {
+    border: 1px solid var(--c-border);
+  }
+  .hg-tabla--responsiva tfoot tr {
+    display: block;
+    background: var(--c-bg-hover);
+    border-radius: var(--r-base);
+    padding: var(--sp-xs) var(--sp-sm);
+  }
+  .hg-tabla--responsiva tfoot td {
+    display: flex;
+    justify-content: space-between;
+    border: none;
+    padding: 4px 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Salto al contenido: visible solo con foco de teclado
+   -------------------------------------------------------------------------- */
+.hg-salto {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 2000;
+  transform: translateY(-200%);
+  background: var(--c-purple);
+  color: #fff;
+  padding: 9px var(--sp-md);
+  border-radius: var(--r-base);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--sh-lg);
+  transition: transform var(--t-fast);
+}
+.hg-salto:focus {
+  transform: translateY(0);
+  text-decoration: none;
+}
+#contenido-principal:focus {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   La cabecera y el pie del modal permanecen visibles mientras el cuerpo
+   se desplaza: en un formulario largo el usuario nunca pierde el titulo ni
+   el boton de guardar.
+   -------------------------------------------------------------------------- */
+.hg-modal__head {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  z-index: 2;
+  flex: none;
+}
+.hg-modal__pie {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .hg-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .hg-modal {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  .hg-modal__pie {
+    border-radius: 0;
+  }
+  /* En movil el pie apila los botones a ancho completo: objetivo tactil claro. */
+  .hg-modal__pie {
+    flex-direction: column-reverse;
+  }
+  .hg-modal__pie .hg-btn {
+    width: 100%;
+  }
+  .hg-toasts {
+    right: var(--sp-md);
+    left: var(--sp-md);
+    bottom: var(--sp-md);
+    max-width: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Banner fijo bajo la cabecera.
+   Se usa en la edicion masiva de avance: mientras haya cambios sin guardar, la
+   barra con el boton de guardar acompana al usuario aunque baje por la tabla.
+   -------------------------------------------------------------------------- */
+.hg-banner--fijo {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 40;
+  box-shadow: var(--sh-md);
+}
+@media (max-width: 640px) {
+  .hg-banner--fijo {
+    top: calc(var(--header-h) - 4px);
+  }
+  .hg-banner--fijo .hg-btn {
+    flex: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Filas de agrupacion en la vista de tarjeta.
+   Una fila de fase usa colSpan; convertida en tarjeta produciria celdas vacias.
+   Se muestra solo la primera celda, que es la que lleva el nombre de la fase.
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo {
+    border-radius: var(--r-base);
+    padding: var(--sp-xs) var(--sp-sm);
+    margin-bottom: 4px;
+  }
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo td {
+    border: none;
+    padding: 2px 0;
+  }
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo td:first-child {
+    font-weight: 600;
+    color: var(--c-purple);
+  }
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo td:not(:first-child):empty,
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo td:not(:first-child):not(:has(*)) {
+    display: none;
+  }
+  .hg-tabla--responsiva tbody tr.hg-fila--grupo td::before {
+    content: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   En la vista de tarjeta, las anchuras minimas que dan densidad al listado en
+   escritorio dejan de tener sentido y provocarian desborde horizontal. Se
+   neutralizan con !important porque vienen como estilo en linea del modulo.
+   -------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .hg-tabla--responsiva tbody td > div,
+  .hg-tabla--responsiva tbody td > span {
+    min-width: 0 !important;
+    text-align: right;
+  }
+  .hg-tabla--responsiva tbody td[data-etiqueta] {
+    padding: 6px 0;
+    gap: var(--sp-md);
+  }
+  .hg-tabla--responsiva tbody td[data-etiqueta]::before {
+    max-width: 38%;
+  }
+  /* La celda de acciones se separa del bloque de datos. */
+  .hg-tabla--responsiva tbody td:not([data-etiqueta]) {
+    padding-top: var(--sp-sm);
+  }
+}
+
+@media (max-width: 640px) {
+  /* El ancho minimo de una tabla ancha se anula en la vista de tarjeta: ahi el
+     contenido se apila y no hay columnas que comprimir. */
+  .hg-tabla--responsiva {
+    min-width: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   Barra de filtros de tablero
+   Una sola fila, pegada bajo la cabecera, que acota todo lo que sigue. Se
+   queda visible al desplazarse: en un tablero largo el lector necesita saber
+   en todo momento que rebanada esta mirando.
+   ========================================================================== */
+.hg-filtros {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-md);
+  flex-wrap: wrap;
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-sm) var(--sp-md);
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  box-shadow: var(--sh-sm);
+}
+.hg-filtros__marca {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 9px;
+  flex: none;
+}
+.hg-filtros__campos {
+  display: flex;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.hg-filtros__pie {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .hg-filtros {
+    position: static;
+    padding: var(--sp-sm);
+  }
+  .hg-filtros__campos .hg-campo {
+    flex: 1 1 132px !important;
+    min-width: 132px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Bloque de veredicto: la frase que un directivo lee y sobre la que actua.
+   -------------------------------------------------------------------------- */
+.hg-veredicto {
+  display: flex;
+  gap: var(--sp-md);
+  align-items: flex-start;
+  border: 1px solid var(--c-border);
+  border-left-width: 4px;
+  border-radius: var(--r-lg);
+  padding: var(--sp-lg) var(--sp-xl);
+  background: var(--c-bg-card);
+}
+.hg-veredicto__titulo {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.hg-veredicto__texto {
+  font-size: var(--fs-base);
+  color: var(--c-text-2);
+  margin-top: 6px;
+  max-width: 92ch;
+}
+.hg-veredicto__decision {
+  margin-top: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--r-base);
+  background: var(--c-bg-hover);
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+  max-width: 92ch;
+}
+.hg-veredicto__icono {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .hg-veredicto {
+    padding: var(--sp-md);
+    gap: var(--sp-sm);
+  }
+  .hg-veredicto__titulo {
+    font-size: var(--fs-md);
   }
 }

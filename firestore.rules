@@ -1,0 +1,235 @@
+rules_version = '2';
+
+/**
+ * Reglas de seguridad de Firestore — HIGEP Web.
+ *
+ * Estas reglas son la barrera real del sistema. La matriz de permisos de la
+ * interfaz (src/auth/permisos.ts) es su espejo para efectos de presentacion,
+ * pero quien decide es este archivo: ninguna comprobacion de rol vive solo en
+ * el cliente (seccion 6 del backlog).
+ *
+ * Principios aplicados:
+ *  1. Dominio institucional obligatorio: sin correo del dominio no hay lectura
+ *     ni escritura, en ninguna coleccion.
+ *  2. Privilegio minimo por rol, tomado del custom claim del token (ADR-05).
+ *  3. Los campos calculados no se escriben desde el cliente: el cliente no
+ *     puede fijar estado de actividad, severidad, nivel de riesgo ni
+ *     resultados de indicador.
+ *  4. La auditoria es append-only: se crea, nunca se actualiza ni se borra.
+ *  5. Un proyecto cerrado es de solo lectura salvo para el administrador.
+ *  6. La baja es logica: el cliente marca `eliminado`, no borra documentos.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- Ayudas
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function dominioInstitucional() {
+      return autenticado()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('.*@iets[.]org[.]co$');
+    }
+
+    function rolGlobal() {
+      return dominioInstitucional() && 'rol' in request.auth.token
+        ? request.auth.token.rol
+        : 'ninguno';
+    }
+
+    function esAdministrador() {
+      return rolGlobal() == 'administrador';
+    }
+
+    function esAuditor() {
+      return rolGlobal() == 'auditor';
+    }
+
+    function esDirectivo() {
+      return rolGlobal() == 'directivo';
+    }
+
+    /** Lectura institucional: ve todo el portafolio, sin editar. */
+    function lecturaInstitucional() {
+      return esAdministrador() || esAuditor() || esDirectivo();
+    }
+
+    function proyecto(proyectoId) {
+      return get(/databases/$(database)/documents/proyectos/$(proyectoId)).data;
+    }
+
+    function existeProyecto(proyectoId) {
+      return exists(/databases/$(database)/documents/proyectos/$(proyectoId));
+    }
+
+    /** Rol efectivo dentro de un proyecto: el del proyecto prevalece. */
+    function rolEnProyecto(proyectoId) {
+      return esAdministrador()
+        ? 'administrador'
+        : (existeProyecto(proyectoId)
+            && proyecto(proyectoId).accesos is map
+            && request.auth.uid in proyecto(proyectoId).accesos
+              ? proyecto(proyectoId).accesos[request.auth.uid]
+              : rolGlobal());
+    }
+
+    function puedeVerProyecto(proyectoId) {
+      return dominioInstitucional()
+        && (lecturaInstitucional()
+            || (existeProyecto(proyectoId)
+                && proyecto(proyectoId).accesos is map
+                && request.auth.uid in proyecto(proyectoId).accesos));
+    }
+
+    function proyectoAbierto(proyectoId) {
+      return existeProyecto(proyectoId) && proyecto(proyectoId).estado != 'cerrado';
+    }
+
+    /** Escritura de contenido: lider o gestor, con el proyecto abierto. */
+    function puedeEditarContenido(proyectoId) {
+      return dominioInstitucional()
+        && (esAdministrador()
+            || (proyectoAbierto(proyectoId)
+                && rolEnProyecto(proyectoId) in ['lider', 'gestor']));
+    }
+
+    /** Escritura reservada al lider: ficha, presupuesto, cierre. */
+    function puedeEditarComoLider(proyectoId) {
+      return dominioInstitucional()
+        && (esAdministrador()
+            || (proyectoAbierto(proyectoId) && rolEnProyecto(proyectoId) == 'lider'));
+    }
+
+    /** Los campos calculados nunca llegan desde el cliente. */
+    function sinCamposCalculados(campos) {
+      return !request.resource.data.diff(
+        resource == null ? request.resource.data : resource.data
+      ).affectedKeys().hasAny(campos);
+    }
+
+    /** Toda escritura debe declarar quien la hizo, y coincidir con el token. */
+    function autoriaCoherente() {
+      return request.resource.data.actualizadoPor == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------- Usuarios
+
+    match /usuarios/{uid} {
+      // Cada usuario lee su propio perfil; el administrador y el auditor, todos.
+      allow get: if dominioInstitucional() && (request.auth.uid == uid || esAdministrador() || esAuditor());
+      allow list: if esAdministrador() || esAuditor();
+
+      // Solo el administrador crea o modifica usuarios y roles.
+      allow create, update: if esAdministrador();
+      // Las cuentas se desactivan, no se borran: se preserva la trazabilidad.
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------- Catalogos
+
+    match /catalogos/{documento=**} {
+      // Todo usuario institucional necesita leer las listas para que la
+      // interfaz valide igual que el servidor.
+      allow read: if dominioInstitucional();
+      allow write: if esAdministrador();
+    }
+
+    // ---------------------------------------------------------------- Proyectos
+
+    match /proyectos/{proyectoId} {
+      allow get: if puedeVerProyecto(proyectoId);
+      allow list: if dominioInstitucional();
+
+      // Crear un proyecto: lider o administrador. El creador queda con acceso.
+      allow create: if dominioInstitucional()
+        && rolGlobal() in ['administrador', 'lider']
+        && autoriaCoherente()
+        && request.resource.data.creadoPor == request.auth.uid;
+
+      // La ficha, la fecha de corte y el ciclo de vida los gobierna el lider.
+      // El gestor puede mover la fecha de corte y el resto de campos de
+      // seguimiento, pero no el estado del proyecto ni los accesos.
+      allow update: if puedeEditarComoLider(proyectoId)
+        || (puedeEditarContenido(proyectoId)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['estado', 'accesos', 'codigo', 'liderUid', 'modoCalculo']));
+
+      // Baja logica unicamente.
+      allow delete: if false;
+
+      // ------------------------------------------------------- Subcolecciones
+
+      // Contenido editable por lider y gestor.
+      match /{coleccion}/{documentoId} {
+        allow read: if puedeVerProyecto(proyectoId);
+
+        allow create, update: if coleccion in [
+            'equipo', 'actividades', 'hitos', 'raci',
+            'riesgos', 'recursos', 'productos', 'satisfaccion'
+          ]
+          && puedeEditarContenido(proyectoId)
+          && autoriaCoherente()
+          // Los campos derivados los calcula el servidor, no el navegador.
+          && sinCamposCalculados([
+            'estado_calculado', 'duracion', 'avanceEsperado', 'holgura',
+            'esCritica', 'severidad', 'nivel'
+          ]);
+
+        // El presupuesto solo lo escribe el lider (HG-107).
+        allow create, update: if coleccion == 'presupuesto'
+          && puedeEditarComoLider(proyectoId)
+          && autoriaCoherente();
+
+        // Las instantaneas de indicadores las produce el servidor.
+        allow create, update: if coleccion == 'snapshots' && esAdministrador();
+
+        allow delete: if false;
+      }
+
+      // El avance de una actividad propia lo puede registrar su responsable
+      // (rol miembro), y nada mas de esa actividad.
+      match /actividades/{actividadId} {
+        allow update: if dominioInstitucional()
+          && proyectoAbierto(proyectoId)
+          && rolEnProyecto(proyectoId) == 'miembro'
+          && resource.data.responsableId != null
+          && request.auth.uid == resource.data.responsableUid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['avance', 'actualizadoEn', 'actualizadoPor'])
+          && request.resource.data.avance is number
+          && request.resource.data.avance >= 0
+          && request.resource.data.avance <= 100
+          && autoriaCoherente();
+      }
+    }
+
+    // ---------------------------------------------------------------- Auditoria
+
+    match /auditoria/{eventoId} {
+      // Lectura: administrador, auditor, y lider o gestor de sus proyectos.
+      allow get, list: if esAdministrador() || esAuditor()
+        || (dominioInstitucional() && rolGlobal() in ['lider', 'gestor']);
+
+      // Append-only (ADR-06): se crea con la identidad del token y jamas se
+      // modifica ni se elimina. Ningun rol, incluido el administrador, puede
+      // alterar el registro.
+      allow create: if dominioInstitucional()
+        && request.resource.data.usuarioUid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+             'fechaHora', 'usuarioUid', 'usuarioNombre', 'accion', 'entidad'
+           ]);
+      allow update, delete: if false;
+    }
+
+    // -------------------------------------------------------- Cierre por defecto
+
+    // Cualquier ruta no contemplada queda cerrada.
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}

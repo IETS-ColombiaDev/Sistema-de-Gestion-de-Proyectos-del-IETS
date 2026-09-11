@@ -364,6 +364,7 @@ export default function Indicadores() {
                 ]}
                 filas={[...snapshots].reverse()}
                 claveDe={(s) => s.id}
+                sinVistaMovil
               />
             </div>
           ))}

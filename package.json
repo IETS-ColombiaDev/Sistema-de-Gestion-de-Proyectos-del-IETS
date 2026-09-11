@@ -2,21 +2,24 @@
   "name": "sistema-de-gestion-de-proyectos-del-iets",
   "version": "1.0.0",
   "private": true,
-  "description": "Sistema de Gestion de Proyectos del IETS (HIGEP Web)",
-  "workspaces": [
-    "frontend"
-  ],
+  "description": "HIGEP Web — Sistema de Gestion de Proyectos del IETS",
   "scripts": {
+    "install:todo": "npm --prefix frontend ci && npm --prefix functions ci",
     "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend run build && npm --prefix functions run build",
     "preview": "npm --prefix frontend run preview",
     "test": "npm --prefix frontend test",
-    "typecheck": "npm --prefix frontend run typecheck",
-    "lint": "npm --prefix frontend run lint"
+    "typecheck": "npm --prefix frontend run lint && npm --prefix functions run build",
+    "verificar": "npm run typecheck && npm test && npm run build",
+    "emuladores": "firebase emulators:start",
+    "desplegar:reglas": "firebase deploy --only firestore:rules,firestore:indexes,storage",
+    "desplegar:funciones": "firebase deploy --only functions",
+    "desplegar:hosting": "npm --prefix frontend run build && firebase deploy --only hosting",
+    "desplegar": "npm run verificar && npm run desplegar:reglas && npm run desplegar:funciones && npm run desplegar:hosting"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
   },
   "author": "Instituto de Evaluacion Tecnologica en Salud (IETS)",
   "license": "UNLICENSED"

@@ -4,6 +4,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { Pista } from '../Ayuda'
 
 interface Props {
   etiqueta: string
@@ -14,12 +15,30 @@ interface Props {
   acento?: string
   onClick?: () => void
   titulo?: string
+  /**
+   * Explicacion de como se obtiene la cifra. Se muestra en un tooltip que se
+   * abre con el cursor y con el foco de teclado: una metrica sin definicion
+   * invita a interpretarla mal.
+   */
+  pista?: string
 }
 
-export default function KPICard({ etiqueta, valor, pie, color, acento, onClick, titulo }: Props) {
+export default function KPICard({
+  etiqueta,
+  valor,
+  pie,
+  color,
+  acento,
+  onClick,
+  titulo,
+  pista,
+}: Props) {
   const contenido = (
     <>
-      <span className="hg-kpi__label">{etiqueta}</span>
+      <span className="hg-kpi__label" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        {etiqueta}
+        {pista && <Pista texto={pista} etiqueta={`Como se calcula: ${etiqueta}`} />}
+      </span>
       <span className="hg-kpi__valor" style={color ? { color } : undefined}>
         {valor}
       </span>

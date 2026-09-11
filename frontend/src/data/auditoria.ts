@@ -82,6 +82,15 @@ export interface ContextoAuditoria {
   comentario?: string
 }
 
+/**
+ * Traduce un conjunto de cambios en eventos de auditoria.
+ *
+ * Un alta produce UN evento con el resumen del registro, no uno por campo: de
+ * lo contrario cada actividad creada inundaria la consulta con una veintena de
+ * lineas sin valor de control. Una actualizacion, en cambio, produce un evento
+ * por campo modificado, que es exactamente lo que el control interno necesita
+ * poder rastrear.
+ */
 export function construirEventos(
   ctx: ContextoAuditoria,
   accion: EventoAuditoria['accion'],
@@ -99,6 +108,24 @@ export function construirEventos(
     entidadId: ctx.entidadId,
     entidadEtiqueta: ctx.entidadEtiqueta,
     comentario: ctx.comentario,
+  }
+
+  if (accion === 'crear') {
+    const diligenciados = cambios
+      .filter((c) => c.nuevo != null && c.nuevo !== '' && c.nuevo !== 'false' && c.nuevo !== '(vacio)')
+      .map((c) => c.campo)
+    return [
+      {
+        ...base,
+        id: nuevoId('aud'),
+        campo: null,
+        valorAnterior: null,
+        valorNuevo:
+          diligenciados.length === 0
+            ? 'Registro creado'
+            : `Registro creado con ${diligenciados.length} campo(s): ${diligenciados.slice(0, 8).join(', ')}${diligenciados.length > 8 ? '…' : ''}`,
+      },
+    ]
   }
 
   if (cambios.length === 0) {

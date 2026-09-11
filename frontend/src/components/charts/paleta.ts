@@ -33,6 +33,61 @@ export function colorSerie(indice: number): string {
 }
 
 /**
+ * Serie del valor ganado. Tres magnitudes de dinero, comparables entre si, con
+ * identidad fija: quien aprende que "lo planeado es indigo" no debe encontrarse
+ * el indigo en otra cosa al filtrar. Son los tres primeros tonos categoricos,
+ * verificados para daltonismo en todos sus pares.
+ */
+export const SERIE_EVM = {
+  planeado: CATEGORICOS[0], // indigo
+  ganado: CATEGORICOS[1], // cian
+  real: CATEGORICOS[2], // magenta
+  /** La proyeccion es el costo real extrapolado: mismo tono, trazo discontinuo. */
+  proyectado: CATEGORICOS[2],
+} as const
+
+/**
+ * Par divergente para polaridad: favorable frente a desfavorable, con gris
+ * neutro en el punto medio.
+ *
+ * Teal y rosa son opuestos en temperatura —la condicion para que el lector no
+ * tenga que consultar la leyenda— y superan el umbral de separacion en
+ * deuteranopia, protanopia y tritanopia. El punto medio es gris, nunca un tono:
+ * cero tiene que leerse como "nada", no como un tercer estado.
+ *
+ * No se usa verde/rojo aqui: ese par falla la separacion por daltonismo y ya
+ * esta reservado al semaforo institucional, que siempre va con etiqueta.
+ *
+ * RESTRICCION: el teal favorable esta cerca del cian de SERIE_EVM (ΔE 6,9 en
+ * vision normal). Los dos conjuntos NO pueden compartir un grafico. No es una
+ * coincidencia afortunada, es una condicion de uso: identidad de serie y
+ * polaridad son trabajos distintos, y un grafico hace uno o el otro.
+ *
+ * Verificado con scripts/validate_palette.js:
+ *   SERIE_EVM (indigo, cian, magenta)  -> todos los pares PASS
+ *   DIVERGENTE (teal, rosa)            -> todos los pares PASS
+ *   los cinco juntos                   -> FAIL, y por eso no coexisten
+ */
+export const DIVERGENTE = {
+  favorable: '#0D9488',
+  favorableSuave: '#CCFBF1',
+  neutro: '#94A3B8',
+  neutroSuave: '#F1F5F9',
+  desfavorable: '#BE123C',
+  desfavorableSuave: '#FFE4E6',
+} as const
+
+/** Devuelve el tono divergente segun el signo, con el sentido explicito. */
+export function tonoDivergente(
+  valor: number,
+  sentido: 'positivoEsBueno' | 'positivoEsMalo' = 'positivoEsBueno',
+): string {
+  if (valor === 0) return DIVERGENTE.neutro
+  const bueno = sentido === 'positivoEsBueno' ? valor > 0 : valor < 0
+  return bueno ? DIVERGENTE.favorable : DIVERGENTE.desfavorable
+}
+
+/**
  * Rampa secuencial de un solo tono, claro a oscuro. Para magnitud, nunca arcoiris.
  */
 export const SECUENCIAL_INDIGO = [
@@ -63,6 +118,29 @@ export const ESTADO = {
   neutro: colors.text.tertiary,
 } as const
 
+/**
+ * Relleno de marca para los vocabularios de estado del negocio.
+ *
+ * No se usan los tonos `fg` del tema: esos son tonos de tinta, calculados para
+ * contrastar sobre un fondo suave en una insignia, y como relleno de barra
+ * resultan apagados y turbios. Estos son los pasos del semaforo, que es el
+ * canal correcto para un estado. Van siempre con etiqueta y con leyenda: el
+ * color de estado nunca es el unico canal de identidad.
+ */
+export const RELLENO_RECURSO = {
+  'Por gestionar': ESTADO.advertencia,
+  Disponible: ESTADO.bueno,
+  Reservado: colors.primary.blue,
+  'No disponible': ESTADO.critico,
+} as const
+
+export const RELLENO_RIESGO = {
+  Bajo: ESTADO.bueno,
+  Medio: ESTADO.advertencia,
+  Alto: ESTADO.serio,
+  Critico: ESTADO.critico,
+} as const
+
 /** Tinta: valores, etiquetas y leyendas nunca llevan el color de la serie. */
 export const TINTA = {
   primaria: colors.text.primary,
@@ -72,3 +150,23 @@ export const TINTA = {
   eje: colors.borders.medium,
   superficie: colors.backgrounds.card,
 } as const
+
+/**
+ * Tinta legible sobre un relleno dado.
+ *
+ * Blanco sobre ambar o sobre verde medio ronda 2:1 de contraste: ilegible en
+ * texto pequeno. Se decide por luminancia relativa en vez de asumir que todo
+ * relleno de color admite texto blanco.
+ */
+export function tintaSobre(relleno: string): string {
+  const hex = relleno.replace('#', '')
+  const completo = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex
+  const canal = (i: number) => {
+    const v = parseInt(completo.slice(i * 2, i * 2 + 2), 16) / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }
+  const luminancia = 0.2126 * canal(0) + 0.7152 * canal(1) + 0.0722 * canal(2)
+  // Umbral en el punto donde el contraste con blanco y con la tinta oscura se
+  // igualan (~0,18 de luminancia relativa).
+  return luminancia > 0.34 ? TINTA.primaria : '#FFFFFF'
+}

@@ -1,0 +1,129 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "proyectoId", "order": "ASCENDING" },
+        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entidad", "order": "ASCENDING" },
+        { "fieldPath": "entidadId", "order": "ASCENDING" },
+        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioUid", "order": "ASCENDING" },
+        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "proyectoId", "order": "ASCENDING" },
+        { "fieldPath": "tipoCambio", "order": "ASCENDING" },
+        { "fieldPath": "fechaHora", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "proyectos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "codigo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "proyectos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "liderUid", "order": "ASCENDING" },
+        { "fieldPath": "fechaEntregaFinal", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "actividades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "actividades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "faseId", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "actividades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "responsableId", "order": "ASCENDING" },
+        { "fieldPath": "fechaFin", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hitos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaProgramada", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "riesgos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "codigo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "raci",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "actividadId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "presupuesto",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "periodo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "satisfaccion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "periodo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "snapshots",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "fechaCorte", "order": "ASCENDING" }]
+    }
+  ],
+  "fieldOverrides": []
+}

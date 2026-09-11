@@ -3,6 +3,7 @@
  */
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { IconCerrar } from './icons'
 
 type TipoToast = 'success' | 'error' | 'warning' | 'info'
@@ -44,7 +45,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      <div className="hg-toasts no-print" aria-live="polite" aria-atomic="false">
+      {createPortal(
+        <div className="hg-toasts no-print" aria-live="polite" aria-atomic="false">
         {avisos.map((a) => (
           <div key={a.id} className={`hg-toast hg-toast--${a.tipo}`} role={a.tipo === 'error' ? 'alert' : 'status'}>
             <span style={{ flex: 1 }}>{a.texto}</span>
@@ -57,8 +59,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <IconCerrar size={14} />
             </button>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>,
+        document.body,
+      )}
     </Ctx.Provider>
   )
 }

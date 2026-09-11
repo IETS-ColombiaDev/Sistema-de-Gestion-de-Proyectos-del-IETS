@@ -17,8 +17,7 @@ import Modal, { ModalConfirmacion } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Field'
 import { Cargando, Vacio } from '@/components/EstadoVista'
 import { useToast } from '@/components/Toast'
-import { BarraApilada, Figura } from '@/components/charts'
-import { estadoColors } from '@/styles/theme'
+import { BarraApilada, Figura, RELLENO_RECURSO } from '@/components/charts'
 import { IconEditar, IconEliminar, IconMas, IconRecurso } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -242,7 +241,7 @@ export default function Recursos() {
             segmentos={DISPONIBILIDAD_RECURSO.map((e) => ({
               etiqueta: e,
               valor: datos.recursos.filter((r) => r.disponibilidad === e).length,
-              color: estadoColors.recurso[e].fg,
+              color: RELLENO_RECURSO[e],
             }))}
           />
         </Figura>

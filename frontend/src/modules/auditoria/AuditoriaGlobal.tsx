@@ -74,6 +74,7 @@ export default function AuditoriaGlobal() {
     {
       clave: 'proyecto',
       titulo: 'Proyecto',
+      ancho: '120px',
       render: (e: EventoAuditoria) => (
         <span className="hg-t-sm">
           {proyectos.find((p) => p.id === e.proyectoId)?.codigo ?? (e.proyectoId ? e.proyectoId : 'Sistema')}
@@ -165,7 +166,12 @@ export default function AuditoriaGlobal() {
           <Vacio titulo="Sin eventos que coincidan" texto="Ajuste los filtros de la consulta." icono={<IconAuditoria size={24} />} />
         ) : (
           <>
-            <Table columnas={columnas} filas={pagina1} claveDe={(e) => e.id} />
+            <Table
+              columnas={columnas}
+              filas={pagina1}
+              claveDe={(e) => e.id}
+              anchoMinimo="1140px"
+            />
             {totalPaginas > 1 && (
               <div className="hg-fila" style={{ justifyContent: 'center', marginTop: 'var(--sp-md)' }}>
                 <Button variante="secondary" tamano="sm" disabled={pagina === 1} onClick={() => setPagina((p) => p - 1)}>

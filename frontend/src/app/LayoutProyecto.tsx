@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Header from '@/components/Header'
 import Sidebar from '@/components/Sidebar'
+import LimiteError from '@/components/LimiteError'
 import Button from '@/components/Button'
 import { Cargando, ErrorVista } from '@/components/EstadoVista'
 import { IconCalendario, IconImprimir, IconRefrescar } from '@/components/icons'
@@ -49,6 +50,9 @@ export default function LayoutProyecto() {
 
   return (
     <div className="hg-shell">
+      <a href="#contenido-principal" className="hg-salto no-print">
+        Ir al contenido principal
+      </a>
       <Sidebar
         grupos={navProyecto(proyectoId)}
         abierta={abierta}
@@ -114,7 +118,7 @@ export default function LayoutProyecto() {
           }
         />
 
-        <main className="hg-contenido">
+        <main className="hg-contenido" id="contenido-principal" tabIndex={-1}>
           {proyecto && (proyecto.estado === 'cerrado' || soloLectura) && (
             <div className="hg-banner no-print" style={{ marginBottom: 'var(--sp-md)' }} role="status">
               <strong>Modo solo lectura.</strong>
@@ -137,7 +141,9 @@ export default function LayoutProyecto() {
               }
             />
           ) : (
-            <Outlet />
+            <LimiteError ambito={`el modulo ${tituloModulo}`}>
+              <Outlet />
+            </LimiteError>
           )}
         </main>
       </div>

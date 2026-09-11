@@ -1,713 +1,699 @@
 /**
- * Administracion de catalogos y parametros — EP-06 (HG-036 a HG-040).
- * Permite al administrador del sistema gestionar las listas controladas,
- * parametros de calculo y el calendario de dias no laborables (festivos).
+ * Administracion de catalogos y parametros — EP-06.
+ *
+ * Reproduce la hoja "Parametros y listas" del libro, con dos diferencias
+ * sustantivas: los valores gobiernan efectivamente las validaciones de la
+ * aplicacion (en el libro eran literales dispersos, D-04 y D-08) y todo cambio
+ * genera evento de auditoria con valor anterior y nuevo (HG-040).
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
 import Badge from '@/components/Badge'
 import KPICard from '@/components/Dashboard/KPICard'
 import Alert from '@/components/Alert'
-import Table, { type Columna } from '@/components/ui/Table'
+import Tabs from '@/components/Tabs'
+import Table from '@/components/ui/Table'
 import Modal, { ModalConfirmacion } from '@/components/ui/Modal'
-import { Input, Select } from '@/components/ui/Field'
-import { Cargando, ErrorVista } from '@/components/EstadoVista'
+import { Checkbox, Input, Textarea } from '@/components/ui/Field'
+import { Cargando, ErrorVista, Vacio } from '@/components/EstadoVista'
+import { Nota, Pista } from '@/components/Ayuda'
 import { useToast } from '@/components/Toast'
 import {
   IconCalendario,
+  IconCandado,
   IconCatalogo,
-  IconCheck,
-  IconEditar,
   IconEliminar,
   IconMas,
+  IconRefrescar,
 } from '@/components/icons'
 import { useAuth } from '@/auth/AuthContext'
 import { puede } from '@/auth/permisos'
 import {
   guardarLista,
   guardarParametros,
+  listarProyectos,
   obtenerListas,
   obtenerParametros,
 } from '@/data/repo'
-import type { ListaControlada, Parametros, ValorLista } from '@/domain/types'
+import { reiniciarDatos, sembrarDatos } from '@/data/seed'
+import { festivosColombia, formatearFecha, hoyISO } from '@/domain/fechas'
+import { numero } from '@/lib/formato'
+import type { ListaControlada, Parametros } from '@/domain/types'
 
-type TabActiva = 'listas' | 'parametros' | 'festivos'
+type Pestana = 'parametros' | 'listas' | 'festivos' | 'datos'
 
 export default function Catalogos() {
   const { usuario } = useAuth()
   const toast = useToast()
-
-  const [tab, setTab] = useState<TabActiva>('listas')
-  const [listas, setListas] = useState<ListaControlada[]>([])
-  const [parametros, setParametros] = useState<Parametros | null>(null)
-  const [cargando, setCargando] = useState(true)
-
-  // Sub-seleccion de lista para ver y editar sus valores
-  const [listaSeleccionadaId, setListaSeleccionadaId] = useState<string>('')
-  const [nuevoValorTexto, setNuevoValorTexto] = useState('')
-
-  // Modal para editar parametros
-  const [editandoParametros, setEditandoParametros] = useState<Parametros | null>(null)
-  const [comentarioParametros, setComentarioParametros] = useState('')
-  const [guardandoParametros, setGuardandoParametros] = useState(false)
-
-  // Agregar festivo
-  const [nuevoFestivo, setNuevoFestivo] = useState('')
-  const [filtroAnioFestivo, setFiltroAnioFestivo] = useState(String(new Date().getFullYear()))
-  const [festivoAEliminar, setFestivoAEliminar] = useState<string | null>(null)
-
   const editable = puede(usuario?.rolGlobal ?? null, 'catalogos.editar')
 
-  const cargarDatos = async () => {
+  const [pestana, setPestana] = useState<Pestana>('parametros')
+  const [parametros, setParametros] = useState<Parametros | null>(null)
+  const [listas, setListas] = useState<ListaControlada[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [listaEnEdicion, setListaEnEdicion] = useState<ListaControlada | null>(null)
+  const [valorNuevo, setValorNuevo] = useState('')
+  const [anioFestivos, setAnioFestivos] = useState(new Date().getFullYear())
+  const [festivoNuevo, setFestivoNuevo] = useState('')
+  const [confirmarReinicio, setConfirmarReinicio] = useState(false)
+  const [comentario, setComentario] = useState('')
+  const [proyectosCount, setProyectosCount] = useState(0)
+
+  const cargar = useCallback(async () => {
     setCargando(true)
     try {
-      const [l, p] = await Promise.all([obtenerListas(), obtenerParametros()])
-      setListas(l)
+      const [p, l, proys] = await Promise.all([obtenerParametros(), obtenerListas(), listarProyectos()])
       setParametros(p)
-      if (l.length > 0 && !listaSeleccionadaId) {
-        setListaSeleccionadaId(l[0].id)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      setListas(l)
+      setProyectosCount(proys.length)
+    } catch (e) {
+      setError((e as Error).message)
     } finally {
       setCargando(false)
     }
-  }
-
-  useEffect(() => {
-    void cargarDatos()
   }, [])
 
-  const listaActual = useMemo(
-    () => listas.find((l) => l.id === listaSeleccionadaId) ?? listas[0] ?? null,
-    [listas, listaSeleccionadaId],
+  useEffect(() => {
+    void cargar()
+  }, [cargar])
+
+  const festivosDelAnio = useMemo(
+    () => (parametros?.festivos ?? []).filter((f) => f.startsWith(String(anioFestivos))).sort(),
+    [parametros, anioFestivos],
   )
-
-  const festivosFiltrados = useMemo(() => {
-    if (!parametros?.festivos) return []
-    return parametros.festivos
-      .filter((f) => (filtroAnioFestivo ? f.startsWith(filtroAnioFestivo) : true))
-      .sort()
-  }, [parametros, filtroAnioFestivo])
-
-  const aniosFestivos = useMemo(() => {
-    if (!parametros?.festivos) return []
-    const setAnios = new Set(parametros.festivos.map((f) => f.slice(0, 4)))
-    const anioActual = String(new Date().getFullYear())
-    setAnios.add(anioActual)
-    setAnios.add(String(Number(anioActual) + 1))
-    return Array.from(setAnios).sort()
-  }, [parametros])
 
   if (!editable) {
     return (
       <ErrorVista
-        titulo="Acceso restringido"
-        detalle="Solo los administradores del sistema pueden gestionar catalogos y parametros institucionales."
+        titulo="Sin permiso para administrar catalogos"
+        detalle="La administracion de listas controladas y parametros globales esta reservada al administrador del sistema."
       />
     )
   }
 
   if (cargando || !parametros) return <Cargando />
+  if (error) return <ErrorVista titulo="No fue posible cargar los catalogos" detalle={error} />
 
-  // ---------------------------------------------------------------------------
-  // Manejadores de Listas Controladas
-  // ---------------------------------------------------------------------------
-
-  const alternarActivoValor = async (valor: ValorLista) => {
-    if (!listaActual) return
-    const nuevosValores = listaActual.valores.map((v) =>
-      v.valor === valor.valor ? { ...v, activo: !v.activo } : v,
-    )
-    const actualizada: ListaControlada = { ...listaActual, valores: nuevosValores }
+  const guardarParams = async (nuevos: Parametros, mensaje: string) => {
+    setGuardando(true)
     try {
-      await guardarLista(
-        actualizada,
-        `${valor.activo ? 'Desactivo' : 'Activo'} el valor "${valor.valor}" en lista ${listaActual.nombre}`,
-      )
-      setListas((prev) => prev.map((l) => (l.id === actualizada.id ? actualizada : l)))
-      toast.exito(`El valor "${valor.valor}" fue actualizado.`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  const agregarValor = async () => {
-    if (!listaActual || !nuevoValorTexto.trim()) return
-    const texto = nuevoValorTexto.trim()
-    if (listaActual.valores.some((v) => v.valor.toLowerCase() === texto.toLowerCase())) {
-      toast.aviso('Ya existe un elemento con este nombre en la lista.')
-      return
-    }
-    const nuevoItem: ValorLista = {
-      valor: texto,
-      activo: true,
-      orden: (listaActual.valores.length ? Math.max(...listaActual.valores.map((v) => v.orden)) : 0) + 1,
-    }
-    const actualizada: ListaControlada = {
-      ...listaActual,
-      valores: [...listaActual.valores, nuevoItem],
-    }
-    try {
-      await guardarLista(
-        actualizada,
-        `Agrego el valor "${texto}" a la lista ${listaActual.nombre}`,
-      )
-      setListas((prev) => prev.map((l) => (l.id === actualizada.id ? actualizada : l)))
-      setNuevoValorTexto('')
-      toast.exito(`Se anadio "${texto}" a la lista.`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Manejadores de Parametros Globales
-  // ---------------------------------------------------------------------------
-
-  const guardarCambiosParametros = async () => {
-    if (!editandoParametros) return
-    setGuardandoParametros(true)
-    try {
-      await guardarParametros(
-        editandoParametros,
-        comentarioParametros.trim() || 'Actualizacion de parametros globales',
-      )
-      setParametros(editandoParametros)
-      setEditandoParametros(null)
-      setComentarioParametros('')
-      toast.exito('Los nuevos parametros rigen de inmediato en el sistema.')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      await guardarParametros(nuevos, comentario || mensaje)
+      setParametros(nuevos)
+      toast.exito('Parametros guardados. Los calculos usan el valor vigente.')
+      setComentario('')
+    } catch (e) {
+      toast.error((e as Error).message)
     } finally {
-      setGuardandoParametros(false)
+      setGuardando(false)
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Manejadores de Dias Festivos
-  // ---------------------------------------------------------------------------
-
-  const agregarFestivo = async () => {
-    if (!nuevoFestivo || !parametros) return
-    if (parametros.festivos.includes(nuevoFestivo)) {
-      toast.aviso('Este dia no laborable ya figura en el calendario.')
-      return
-    }
-    const nuevosFestivos = [...parametros.festivos, nuevoFestivo].sort()
-    const parametrosActualizados: Parametros = {
-      ...parametros,
-      festivos: nuevosFestivos,
-    }
+  const guardarListaEditada = async () => {
+    if (!listaEnEdicion) return
+    setGuardando(true)
     try {
-      await guardarParametros(
-        parametrosActualizados,
-        `Agrego el festivo ${nuevoFestivo} al calendario`,
-      )
-      setParametros(parametrosActualizados)
-      setNuevoFestivo('')
-      toast.exito(`El dia ${nuevoFestivo} fue incorporado al calendario.`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      await guardarLista(listaEnEdicion, 'Edicion de lista controlada')
+      setListas((prev) => prev.map((l) => (l.id === listaEnEdicion.id ? listaEnEdicion : l)))
+      toast.exito('Lista actualizada.')
+      setListaEnEdicion(null)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setGuardando(false)
     }
   }
 
-  const confirmarEliminarFestivo = async () => {
-    if (!festivoAEliminar || !parametros) return
-    const nuevosFestivos = parametros.festivos.filter((f) => f !== festivoAEliminar)
-    const parametrosActualizados: Parametros = {
-      ...parametros,
-      festivos: nuevosFestivos,
-    }
+  const sembrar = async () => {
+    setGuardando(true)
     try {
-      await guardarParametros(
-        parametrosActualizados,
-        `Elimino el festivo ${festivoAEliminar} del calendario`,
-      )
-      setParametros(parametrosActualizados)
-      setFestivoAEliminar(null)
-      toast.exito(`Se retiro el dia ${festivoAEliminar} del calendario.`)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
+      const r = await sembrarDatos(false)
+      if (r) toast.exito(`Datos de prueba cargados: ${r.actividades} actividades en el proyecto de referencia.`)
+      else toast.info('Ya existen proyectos. Use "Reiniciar entorno" si desea regenerar los datos de prueba.')
+      await cargar()
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setGuardando(false)
     }
   }
 
-  const columnasValores: Columna<ValorLista>[] = [
-    { clave: 'orden', titulo: '#', ancho: '60px', render: (v) => <span className="hg-t-muted">{v.orden}</span> },
-    {
-      clave: 'valor',
-      titulo: 'Valor / Etiqueta',
-      render: (v) => (
-        <span className={v.activo ? 'hg-t-negrita' : 'hg-t-muted'}>{v.valor}</span>
-      ),
-    },
-    {
-      clave: 'estado',
-      titulo: 'Estado',
-      ancho: '120px',
-      render: (v) => (
-        <Badge
-          fg={v.activo ? '#15803D' : '#64748B'}
-          bg={v.activo ? '#DCFCE7' : '#F1F5F9'}
-        >
-          {v.activo ? 'Activo' : 'Inactivo'}
-        </Badge>
-      ),
-    },
-    {
-      clave: 'acciones',
-      titulo: 'Accion',
-      ancho: '140px',
-      render: (v) => (
-        <Button
-          tamano="sm"
-          variante={v.activo ? 'ghost' : 'secondary'}
-          onClick={() => void alternarActivoValor(v)}
-        >
-          {v.activo ? 'Desactivar' : 'Activar'}
-        </Button>
-      ),
-    },
-  ]
+  const reiniciar = async () => {
+    setGuardando(true)
+    setConfirmarReinicio(false)
+    try {
+      await reiniciarDatos()
+      toast.exito('Entorno reiniciado con datos de prueba.')
+      await cargar()
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setGuardando(false)
+    }
+  }
 
   return (
     <div className="hg-pila">
-      {/* KPIs de administracion */}
+      <Nota regla="ADR-07">
+        Las listas y los parametros viven en la base de datos, no en el codigo: se mantienen sin desplegar
+        una version nueva, y cada cambio queda auditado.
+      </Nota>
+
       <div className="hg-grid hg-grid--kpi">
+        <KPICard etiqueta="Listas controladas" valor={listas.length} acento="#6366F1" />
         <KPICard
-          etiqueta="Listas controladas"
-          valor={listas.length}
-          pie={`${listas.filter((l) => l.editable).length} editables por admin`}
-          acento="#6366F1"
+          etiqueta="Dias no laborables"
+          valor={numero(parametros.festivos.length)}
+          pie="Alimentan el conteo de dias habiles"
+          acento="#0891B2"
         />
         <KPICard
           etiqueta="Ventana de alerta"
           valor={`${parametros.ventanaAlertaDias} dias`}
-          pie="Para actividades e hitos proximos"
-          acento="#0891B2"
-        />
-        <KPICard
-          etiqueta="Umbral de atencion"
-          valor={`±${parametros.umbralAtencion}%`}
-          pie={`Precaucion: ±${parametros.umbralPrecaucion}%`}
+          pie="Anticipacion de la alerta de entrega"
           acento="#CA8A04"
         />
-        <KPICard
-          etiqueta="Dias no laborables"
-          valor={parametros.festivos.length}
-          pie={`Festivos cargados (${filtroAnioFestivo || 'todos'})`}
-          acento="#15803D"
-        />
+        <KPICard etiqueta="Proyectos en el sistema" valor={proyectosCount} acento="#15803D" />
       </div>
 
-      {/* Tabs */}
-      <div className="hg-pestanas" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'listas'}
-          className={`hg-pestana ${tab === 'listas' ? 'hg-pestana--activa' : ''}`}
-          onClick={() => setTab('listas')}
-        >
-          <IconCatalogo /> Listas controladas
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'parametros'}
-          className={`hg-pestana ${tab === 'parametros' ? 'hg-pestana--activa' : ''}`}
-          onClick={() => setTab('parametros')}
-        >
-          <IconCheck /> Parametros del sistema
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'festivos'}
-          className={`hg-pestana ${tab === 'festivos' ? 'hg-pestana--activa' : ''}`}
-          onClick={() => setTab('festivos')}
-        >
-          <IconCalendario /> Calendario y festivos
-        </button>
-      </div>
-
-      {/* CONTENIDO: LISTAS */}
-      {tab === 'listas' && (
-        <div className="hg-grid hg-grid--2col">
-          {/* Columna izquierda: catalogo de listas */}
-          <Card
-            titulo="Vocabularios controlados"
-            subtitulo="Seleccione una lista para ver y gestionar sus opciones admitidas."
-          >
-            <div className="hg-lista-seleccionable">
-              {listas.map((l) => {
-                const esActual = l.id === listaActual?.id
-                return (
-                  <div
-                    key={l.id}
-                    onClick={() => setListaSeleccionadaId(l.id)}
-                    className={`hg-fila-seleccionable ${esActual ? 'hg-fila-seleccionable--activa' : ''}`}
-                    style={{
-                      padding: '12px 16px',
-                      cursor: 'pointer',
-                      borderRadius: '8px',
-                      border: esActual ? '1px solid #6366F1' : '1px solid transparent',
-                      background: esActual ? '#EEF2FF' : 'transparent',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="hg-t-negrita" style={{ color: esActual ? '#4F46E5' : 'inherit' }}>
-                        {l.nombre}
-                      </span>
-                      <Badge
-                        fg={l.editable ? '#4338CA' : '#64748B'}
-                        bg={l.editable ? '#E0E7FF' : '#F1F5F9'}
-                      >
-                        {l.editable ? 'Editable' : 'Sistema'}
-                      </Badge>
-                    </div>
-                    <div className="hg-t-sm hg-t-muted" style={{ marginTop: '4px' }}>
-                      {l.descripcion}
-                    </div>
-                    <div className="hg-t-xs hg-t-muted" style={{ marginTop: '4px' }}>
-                      {l.valores.filter((v) => v.activo).length} activos de {l.valores.length} valores
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-
-          {/* Columna derecha: valores de la lista seleccionada */}
-          {listaActual && (
-            <Card
-              titulo={`Valores de: ${listaActual.nombre}`}
-              subtitulo={
-                listaActual.editable
-                  ? 'Agregue nuevos valores o desactive los que ya no correspondan (HG-037).'
-                  : 'Esta lista esta protegida por el motor de calculo y no admite nuevos literales.'
-              }
-              acciones={
-                !listaActual.editable ? (
-                  <Badge fg="#B45309" bg="#FEF3C7">Solo lectura (motor)</Badge>
-                ) : null
-              }
-            >
-              {!listaActual.editable && (
-                <Alert
-                  tipo="info"
-                  titulo="Lista protegida del sistema"
-                  mensaje="Los valores de esta lista forman parte de las formulas de calculo (ej. estados de actividad y riesgo). Modificarlos directamente invalidaria la logica de negocio."
-                />
-              )}
-
-              {listaActual.editable && (
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                  <Input
-                    placeholder="Nuevo elemento para la lista..."
-                    value={nuevoValorTexto}
-                    onChange={(e) => setNuevoValorTexto(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void agregarValor()
-                    }}
-                  />
-                  <Button
-                    variante="primary"
-                    onClick={() => void agregarValor()}
-                    disabled={!nuevoValorTexto.trim()}
-                  >
-                    <IconMas /> Agregar
-                  </Button>
-                </div>
-              )}
-
-              <Table<ValorLista>
-                columnas={columnasValores}
-                filas={listaActual.valores}
-                claveDe={(v) => v.valor}
-                vacio="No hay valores definidos en esta lista."
+      <Card
+        titulo="Catalogos y parametros del sistema"
+        acciones={
+          <Tabs
+            opciones={[
+              { valor: 'parametros', etiqueta: 'Parametros' },
+              { valor: 'listas', etiqueta: 'Listas', conteo: listas.length },
+              { valor: 'festivos', etiqueta: 'Dias no laborables' },
+              { valor: 'datos', etiqueta: 'Datos de prueba' },
+            ]}
+            activa={pestana}
+            onCambiar={(v) => setPestana(v as Pestana)}
+            etiquetaAria="Secciones de administracion"
+          />
+        }
+      >
+        {pestana === 'parametros' && (
+          <div className="hg-pila">
+            <div className="hg-grid hg-grid--form">
+              <Input
+                label="Ventana de alerta de entrega (dias)"
+                type="number"
+                min={1}
+                max={180}
+                value={parametros.ventanaAlertaDias}
+                ayuda="Con cuantos dias de anticipacion el sistema advierte una entrega proxima."
+                onChange={(e) =>
+                  setParametros({ ...parametros, ventanaAlertaDias: Math.max(1, Number(e.target.value)) })
+                }
               />
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* CONTENIDO: PARAMETROS */}
-      {tab === 'parametros' && (
-        <Card
-          titulo="Parametros globales de calculo"
-          subtitulo="Valores de referencia utilizados por el motor de inferencia, reglas de negocio y semaforizacion."
-          acciones={
-            <Button
-              variante="primary"
-              onClick={() => setEditandoParametros({ ...parametros })}
-            >
-              <IconEditar /> Modificar parametros
-            </Button>
-          }
-        >
-          <div className="hg-grid hg-grid--2col" style={{ marginTop: '8px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="hg-campo-detalle">
-                <span className="hg-t-muted hg-t-sm">Ventana de alertas (RN-10):</span>
-                <p className="hg-t-lg hg-t-negrita">{parametros.ventanaAlertaDias} dias calendario</p>
-                <span className="hg-t-xs hg-t-muted">
-                  Plazo para considerar que una actividad o entrega final esta en cuenta regresiva proxima.
-                </span>
-              </div>
-
-              <div className="hg-campo-detalle">
-                <span className="hg-t-muted hg-t-sm">Umbral de atencion (RN-06):</span>
-                <p className="hg-t-lg hg-t-negrita">±{parametros.umbralAtencion} %</p>
-                <span className="hg-t-xs hg-t-muted">
-                  Desviacion porcentual entre avance real y esperado para activar alerta naranja de atencion.
-                </span>
-              </div>
-
-              <div className="hg-campo-detalle">
-                <span className="hg-t-muted hg-t-sm">Umbral de precaucion (RN-06):</span>
-                <p className="hg-t-lg hg-t-negrita">±{parametros.umbralPrecaucion} %</p>
-                <span className="hg-t-xs hg-t-muted">
-                  Desviacion inicial donde se dispara marca de precaucion amarilla.
-                </span>
-              </div>
+              <Input
+                label="Umbral de precaucion (puntos)"
+                type="number"
+                min={1}
+                max={100}
+                value={parametros.umbralPrecaucion}
+                ayuda="Desviacion negativa de avance a partir de la cual se advierte precaucion."
+                onChange={(e) =>
+                  setParametros({ ...parametros, umbralPrecaucion: Math.max(1, Number(e.target.value)) })
+                }
+              />
+              <Input
+                label="Umbral de atencion (puntos)"
+                type="number"
+                min={1}
+                max={100}
+                value={parametros.umbralAtencion}
+                ayuda="Desviacion negativa de avance que activa la alerta de atencion."
+                onChange={(e) =>
+                  setParametros({ ...parametros, umbralAtencion: Math.max(1, Number(e.target.value)) })
+                }
+              />
+              <Input
+                label="Retencion de auditoria (meses)"
+                type="number"
+                min={12}
+                max={240}
+                value={parametros.retencionAuditoriaMeses}
+                ayuda="Periodo durante el cual los eventos permanecen en consulta directa."
+                onChange={(e) =>
+                  setParametros({ ...parametros, retencionAuditoriaMeses: Math.max(12, Number(e.target.value)) })
+                }
+              />
+              <Input
+                label="Tamano maximo de adjunto (MB)"
+                type="number"
+                min={1}
+                max={200}
+                value={parametros.maxAdjuntoMB}
+                onChange={(e) => setParametros({ ...parametros, maxAdjuntoMB: Math.max(1, Number(e.target.value)) })}
+              />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="hg-campo-detalle">
-                <span className="hg-t-muted hg-t-sm">Retencion de auditoria (HG-130):</span>
-                <p className="hg-t-lg hg-t-negrita">{parametros.retencionAuditoriaMeses} meses ({Math.round(parametros.retencionAuditoriaMeses / 12)} anos)</p>
-                <span className="hg-t-xs hg-t-muted">
-                  Periodo durante el cual los eventos de auditoria son inalterables y accesibles.
-                </span>
-              </div>
+            {parametros.umbralAtencion <= parametros.umbralPrecaucion && (
+              <Alert
+                tipo="warning"
+                titulo="Umbrales incoherentes"
+                mensaje="El umbral de atencion debe ser mayor que el de precaucion: la atencion es la situacion mas grave."
+              />
+            )}
 
-              <div className="hg-campo-detalle">
-                <span className="hg-t-muted hg-t-sm">Tamano maximo de adjunto:</span>
-                <p className="hg-t-lg hg-t-negrita">{parametros.maxAdjuntoMB} MB</p>
-                <span className="hg-t-xs hg-t-muted">
-                  Limite por archivo para evidencias de entregables y productos.
-                </span>
-              </div>
-
-              <div className="hg-campo-detalle">
-                <span className="hg-t-muted hg-t-sm">Ultima actualizacion:</span>
-                <p className="hg-t-base">
-                  {parametros.actualizadoEn ? new Date(parametros.actualizadoEn).toLocaleString('es-CO') : 'Inicial'} · por{' '}
-                  <span className="hg-t-negrita">{parametros.actualizadoPor}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* CONTENIDO: FESTIVOS */}
-      {tab === 'festivos' && (
-        <Card
-          titulo="Calendario de dias no laborables (HG-039)"
-          subtitulo="Determina los dias habiles reales para el calculo de duracion en cronograma y cumplimiento de hitos."
-          acciones={
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <Select
-                value={filtroAnioFestivo}
-                onChange={(e) => setFiltroAnioFestivo(e.target.value)}
-                style={{ width: '140px' }}
-              >
-                <option value="">Todos los anos</option>
-                {aniosFestivos.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          }
-        >
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', maxWidth: '400px' }}>
-            <Input
-              type="date"
-              value={nuevoFestivo}
-              onChange={(e) => setNuevoFestivo(e.target.value)}
+            <Textarea
+              label="Justificacion del cambio"
+              rows={2}
+              value={comentario}
+              ayuda="Opcional pero recomendada: queda en el registro de auditoria junto al valor anterior y el nuevo."
+              onChange={(e) => setComentario(e.target.value)}
             />
-            <Button
-              variante="primary"
-              onClick={() => void agregarFestivo()}
-              disabled={!nuevoFestivo}
-            >
-              <IconMas /> Registrar festivo
-            </Button>
-          </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: '12px',
-            }}
-          >
-            {festivosFiltrados.map((fecha) => (
-              <div
-                key={fecha}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '10px 14px',
-                  background: '#F8FAFC',
-                  borderRadius: '8px',
-                  border: '1px solid #E2E8F0',
-                }}
-              >
-                <div>
-                  <div className="hg-t-negrita">{fecha}</div>
-                  <div className="hg-t-xs hg-t-muted">
-                    {new Date(fecha + 'T12:00:00Z').toLocaleDateString('es-CO', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </div>
-                </div>
-                <Button
-                  tamano="sm"
-                  variante="ghost"
-                  onClick={() => setFestivoAEliminar(fecha)}
-                >
-                  <IconEliminar size={14} />
-                </Button>
-              </div>
-            ))}
-          </div>
-
-          {festivosFiltrados.length === 0 && (
-            <p className="hg-t-muted" style={{ marginTop: '16px' }}>
-              No hay festivos registrados para el ano seleccionado.
-            </p>
-          )}
-        </Card>
-      )}
-
-      {/* Modal para editar parametros globales */}
-      {editandoParametros && (
-        <Modal
-          titulo="Modificar parametros del sistema"
-          abierto={true}
-          onCerrar={() => setEditandoParametros(null)}
-          pie={
-            <>
-              <Button variante="ghost" onClick={() => setEditandoParametros(null)}>
-                Cancelar
+            <div className="hg-fila hg-fila--fin">
+              <Button variante="secondary" onClick={() => void cargar()}>
+                Descartar cambios
               </Button>
               <Button
                 variante="primary"
-                onClick={() => void guardarCambiosParametros()}
-                disabled={guardandoParametros}
+                cargando={guardando}
+                disabled={parametros.umbralAtencion <= parametros.umbralPrecaucion}
+                onClick={() => void guardarParams(parametros, 'Actualizacion de parametros globales')}
               >
-                {guardandoParametros ? 'Guardando...' : 'Guardar y auditar'}
+                Guardar parametros
               </Button>
-            </>
-          }
-        >
-          <div className="hg-pila" style={{ gap: '16px' }}>
-            <Input
-              label="Ventana de alertas (dias calendario)"
-              type="number"
-              min={1}
-              max={60}
-              value={editandoParametros.ventanaAlertaDias}
-              onChange={(e) =>
-                setEditandoParametros({
-                  ...editandoParametros,
-                  ventanaAlertaDias: Number(e.target.value),
-                })
-              }
-              ayuda="Dias previos a la fecha fin para considerar una entrega como urgente."
-            />
+            </div>
+          </div>
+        )}
 
-            <Input
-              label="Umbral de atencion (%)"
-              type="number"
-              min={1}
-              max={50}
-              value={editandoParametros.umbralAtencion}
-              onChange={(e) =>
-                setEditandoParametros({
-                  ...editandoParametros,
-                  umbralAtencion: Number(e.target.value),
-                })
-              }
-              ayuda="Desviacion del avance para nivel Critico/Atencion."
-            />
-
-            <Input
-              label="Umbral de precaucion (%)"
-              type="number"
-              min={1}
-              max={50}
-              value={editandoParametros.umbralPrecaucion}
-              onChange={(e) =>
-                setEditandoParametros({
-                  ...editandoParametros,
-                  umbralPrecaucion: Number(e.target.value),
-                })
-              }
-              ayuda="Desviacion inicial para advertencia."
-            />
-
-            <Input
-              label="Retencion de auditoria (meses)"
-              type="number"
-              min={12}
-              max={240}
-              value={editandoParametros.retencionAuditoriaMeses}
-              onChange={(e) =>
-                setEditandoParametros({
-                  ...editandoParametros,
-                  retencionAuditoriaMeses: Number(e.target.value),
-                })
-              }
-            />
-
-            <Input
-              label="Tamano maximo de adjunto (MB)"
-              type="number"
-              min={1}
-              max={100}
-              value={editandoParametros.maxAdjuntoMB}
-              onChange={(e) =>
-                setEditandoParametros({
-                  ...editandoParametros,
-                  maxAdjuntoMB: Number(e.target.value),
-                })
-              }
-            />
-
-            <Input
-              label="Justificacion del cambio (obligatorio para auditoria)"
-              placeholder="Describa el motivo de la modificacion..."
-              value={comentarioParametros}
-              onChange={(e) => setComentarioParametros(e.target.value)}
+        {pestana === 'listas' && (
+          <div className="hg-pila">
+            <p className="hg-t-sm hg-t-sec">
+              Un valor en uso no se elimina: se desactiva, para que los registros historicos conserven su
+              significado. Las listas del motor de calculo no son editables.
+            </p>
+            <Table
+              columnas={[
+                {
+                  clave: 'nombre',
+                  titulo: 'Lista',
+                  ordenable: true,
+                  render: (l: ListaControlada) => (
+                    <div style={{ minWidth: 220 }}>
+                      <span className="hg-t-sm hg-t-bold">{l.nombre}</span>
+                      {!l.editable && (
+                        <Badge fg="#64748B" bg="#F1F5F9" titulo="Gobernada por el motor de calculo">
+                          sistema
+                        </Badge>
+                      )}
+                      <div className="hg-t-xs hg-t-sec">{l.descripcion}</div>
+                    </div>
+                  ),
+                },
+                {
+                  clave: 'valores',
+                  titulo: 'Valores',
+                  render: (l) => (
+                    <div className="hg-fila" style={{ gap: 4 }}>
+                      {l.valores.map((v) => (
+                        <Badge
+                          key={v.valor}
+                          fg={v.activo ? '#4F46E5' : '#94A3B8'}
+                          bg={v.activo ? '#EEF2FF' : '#F1F5F9'}
+                          titulo={v.activo ? 'Activo' : 'Desactivado'}
+                        >
+                          {v.valor}
+                        </Badge>
+                      ))}
+                    </div>
+                  ),
+                },
+                {
+                  clave: 'total',
+                  titulo: 'Activos',
+                  alineacion: 'derecha',
+                  render: (l) => `${l.valores.filter((v) => v.activo).length} / ${l.valores.length}`,
+                },
+                {
+                  clave: 'acciones',
+                  titulo: '',
+                  alineacion: 'derecha',
+                  render: (l) => (
+                    <Button
+                      variante={l.editable ? 'secondary' : 'ghost'}
+                      tamano="sm"
+                      icono={l.editable ? undefined : <IconCandado size={14} />}
+                      onClick={() => {
+                        setListaEnEdicion(structuredClone(l))
+                        setValorNuevo('')
+                      }}
+                    >
+                      {l.editable ? 'Editar' : 'Ver'}
+                    </Button>
+                  ),
+                },
+              ]}
+              filas={listas}
+              claveDe={(l) => l.id}
             />
           </div>
-        </Modal>
-      )}
+        )}
 
-      {/* Modal confirmacion eliminar festivo */}
-      {festivoAEliminar && (
-        <ModalConfirmacion
-          titulo="Eliminar dia festivo"
-          mensaje={`¿Esta seguro de retirar la fecha ${festivoAEliminar} del calendario de festivos? El calculo de duracion de actividades y fechas limite se ajustara en consecuencia.`}
-          textoConfirmar="Si, eliminar"
-          abierto={true}
-          variante="danger"
-          onConfirmar={() => void confirmarEliminarFestivo()}
-          onCerrar={() => setFestivoAEliminar(null)}
-        />
-      )}
+        {pestana === 'festivos' && (
+          <div className="hg-pila">
+            <Nota regla="HG-039">
+              Los dias no laborables alimentan el conteo de dias habiles de la duracion de las actividades. Los
+              festivos de Colombia se calculan con la Ley Emiliani, de modo que el sistema no caduca; aqui puede
+              agregar dias institucionales adicionales.
+            </Nota>
+
+            <div className="hg-barra-filtros">
+              <Input
+                label="Ano"
+                type="number"
+                min={2000}
+                max={2100}
+                value={anioFestivos}
+                onChange={(e) => setAnioFestivos(Number(e.target.value))}
+                style={{ maxWidth: 130 }}
+              />
+              <Button
+                variante="secondary"
+                icono={<IconRefrescar size={15} />}
+                onClick={() => {
+                  const calculados = festivosColombia(anioFestivos)
+                  const faltantes = calculados.filter((f) => !parametros.festivos.includes(f))
+                  if (faltantes.length === 0) {
+                    toast.info(`Los festivos de ${anioFestivos} ya estan cargados.`)
+                    return
+                  }
+                  void guardarParams(
+                    { ...parametros, festivos: [...parametros.festivos, ...faltantes].sort() },
+                    `Carga de ${faltantes.length} festivos de ${anioFestivos}`,
+                  )
+                }}
+              >
+                Cargar festivos de {anioFestivos}
+              </Button>
+              <Input
+                label="Agregar un dia no laborable"
+                type="date"
+                value={festivoNuevo}
+                onChange={(e) => setFestivoNuevo(e.target.value)}
+              />
+              <Button
+                variante="primary"
+                disabled={!festivoNuevo || parametros.festivos.includes(festivoNuevo)}
+                icono={<IconMas size={15} />}
+                onClick={() => {
+                  void guardarParams(
+                    { ...parametros, festivos: [...parametros.festivos, festivoNuevo].sort() },
+                    `Alta del dia no laborable ${festivoNuevo}`,
+                  )
+                  setFestivoNuevo('')
+                }}
+              >
+                Agregar
+              </Button>
+            </div>
+
+            {festivosDelAnio.length === 0 ? (
+              <Vacio
+                titulo={`No hay dias no laborables cargados para ${anioFestivos}`}
+                texto="Use el boton de carga automatica para traer los festivos nacionales del ano."
+                icono={<IconCalendario size={24} />}
+              />
+            ) : (
+              <Table
+                columnas={[
+                  {
+                    clave: 'fecha',
+                    titulo: 'Fecha',
+                    render: (f: string) => <span className="hg-t-sm">{formatearFecha(f, 'largo')}</span>,
+                  },
+                  {
+                    clave: 'dia',
+                    titulo: 'Dia de la semana',
+                    render: (f) =>
+                      new Intl.DateTimeFormat('es-CO', { weekday: 'long', timeZone: 'UTC' }).format(
+                        new Date(`${f}T00:00:00Z`),
+                      ),
+                  },
+                  {
+                    clave: 'acciones',
+                    titulo: '',
+                    alineacion: 'derecha',
+                    render: (f) => (
+                      <Button
+                        variante="ghost"
+                        tamano="sm"
+                        soloIcono
+                        aria-label={`Quitar ${f}`}
+                        icono={<IconEliminar size={15} />}
+                        onClick={() =>
+                          void guardarParams(
+                            { ...parametros, festivos: parametros.festivos.filter((x) => x !== f) },
+                            `Baja del dia no laborable ${f}`,
+                          )
+                        }
+                      />
+                    ),
+                  },
+                ]}
+                filas={festivosDelAnio}
+                claveDe={(f) => f}
+              />
+            )}
+          </div>
+        )}
+
+        {pestana === 'datos' && (
+          <div className="hg-pila">
+            <Nota>
+              Herramientas del entorno de trabajo. Los datos de prueba son sinteticos: reproducen la estructura
+              del instrumento HIGEP V2 (28 actividades, 12 hitos, 13 riesgos, 9 recursos) y cinco cortes
+              historicos por proyecto, no el contenido de ningun proyecto real.
+            </Nota>
+
+            <div className="hg-grid hg-grid--2">
+              <div
+                style={{
+                  border: '1px solid var(--c-border)',
+                  borderRadius: 'var(--r-base)',
+                  padding: 'var(--sp-md)',
+                }}
+              >
+                <h3 className="hg-t-bold" style={{ fontSize: 'var(--fs-md)' }}>
+                  Cargar datos de prueba
+                </h3>
+                <p className="hg-t-sm hg-t-sec" style={{ margin: '6px 0 var(--sp-md)' }}>
+                  Crea catalogos, usuarios de los seis roles y cuatro proyectos con perfiles de desempeno distintos, si el sistema esta
+                  vacio. No sobrescribe informacion existente.
+                </p>
+                <Button variante="primary" cargando={guardando} onClick={() => void sembrar()} icono={<IconMas size={15} />}>
+                  Cargar datos de prueba
+                </Button>
+              </div>
+
+              <div
+                style={{
+                  border: '1px solid #FECACA',
+                  background: '#FEF2F2',
+                  borderRadius: 'var(--r-base)',
+                  padding: 'var(--sp-md)',
+                }}
+              >
+                <h3 className="hg-t-bold" style={{ fontSize: 'var(--fs-md)', color: '#B91C1C' }}>
+                  Reiniciar el entorno
+                  <Pista texto="Borra proyectos, catalogos, usuarios y auditoria, y vuelve a sembrar los datos de prueba. Solo debe usarse en entornos de desarrollo o demostracion." />
+                </h3>
+                <p className="hg-t-sm" style={{ margin: '6px 0 var(--sp-md)', color: '#7F1D1D' }}>
+                  Elimina <strong>toda</strong> la informacion, incluida la auditoria, y regenera los datos de
+                  prueba. Accion irreversible.
+                </p>
+                <Button variante="danger" cargando={guardando} onClick={() => setConfirmarReinicio(true)} icono={<IconEliminar size={15} />}>
+                  Eliminar todo y reiniciar
+                </Button>
+              </div>
+            </div>
+
+            <Table
+              columnas={[
+                { clave: 'k', titulo: 'Elemento', render: (r: { k: string; v: string }) => r.k },
+                { clave: 'v', titulo: 'Valor', render: (r) => r.v },
+              ]}
+              filas={[
+                { k: 'Fecha de hoy en el sistema', v: formatearFecha(hoyISO(), 'largo') },
+                { k: 'Proyectos registrados', v: String(proyectosCount) },
+                { k: 'Listas controladas', v: String(listas.length) },
+                { k: 'Dias no laborables cargados', v: String(parametros.festivos.length) },
+                {
+                  k: 'Ultima actualizacion de parametros',
+                  v: `${formatearFecha(parametros.actualizadoEn.slice(0, 10))} por ${parametros.actualizadoPor}`,
+                },
+              ]}
+              claveDe={(r) => r.k}
+            />
+          </div>
+        )}
+      </Card>
+
+      <Modal
+        abierto={listaEnEdicion !== null}
+        tamano="lg"
+        titulo={listaEnEdicion?.nombre ?? ''}
+        subtitulo={listaEnEdicion?.descripcion}
+        onCerrar={() => setListaEnEdicion(null)}
+        pie={
+          listaEnEdicion?.editable ? (
+            <>
+              <Button variante="secondary" onClick={() => setListaEnEdicion(null)}>
+                Cancelar
+              </Button>
+              <Button variante="primary" cargando={guardando} onClick={() => void guardarListaEditada()}>
+                Guardar lista
+              </Button>
+            </>
+          ) : (
+            <Button variante="secondary" onClick={() => setListaEnEdicion(null)}>
+              Cerrar
+            </Button>
+          )
+        }
+      >
+        {listaEnEdicion && (
+          <div className="hg-pila">
+            {!listaEnEdicion.editable && (
+              <Alert
+                tipo="info"
+                titulo="Lista gobernada por el motor de calculo"
+                mensaje="Sus valores estan referenciados por las reglas de negocio. Modificarlos rompería los calculos, por eso es de solo lectura."
+              />
+            )}
+
+            <div className="hg-pila" style={{ gap: 6 }}>
+              {listaEnEdicion.valores
+                .slice()
+                .sort((a, b) => a.orden - b.orden)
+                .map((v, i) => (
+                  <div
+                    key={v.valor}
+                    className="hg-fila"
+                    style={{
+                      border: '1px solid var(--c-border)',
+                      borderRadius: 'var(--r-base)',
+                      padding: '6px var(--sp-sm)',
+                      flexWrap: 'nowrap',
+                    }}
+                  >
+                    <span className="hg-t-ter hg-t-num" style={{ width: 22 }}>
+                      {i + 1}
+                    </span>
+                    <input
+                      className="hg-input hg-input--sm"
+                      style={{ flex: 1, minWidth: 120 }}
+                      value={v.valor}
+                      disabled={!listaEnEdicion.editable}
+                      aria-label={`Valor ${i + 1}`}
+                      onChange={(e) =>
+                        setListaEnEdicion({
+                          ...listaEnEdicion,
+                          valores: listaEnEdicion.valores.map((x) =>
+                            x.valor === v.valor ? { ...x, valor: e.target.value } : x,
+                          ),
+                        })
+                      }
+                    />
+                    <Checkbox
+                      label="Activo"
+                      checked={v.activo}
+                      disabled={!listaEnEdicion.editable}
+                      onChange={(e) =>
+                        setListaEnEdicion({
+                          ...listaEnEdicion,
+                          valores: listaEnEdicion.valores.map((x) =>
+                            x.valor === v.valor ? { ...x, activo: e.target.checked } : x,
+                          ),
+                        })
+                      }
+                    />
+                    {listaEnEdicion.editable && (
+                      <Button
+                        variante="ghost"
+                        tamano="sm"
+                        soloIcono
+                        aria-label={`Quitar ${v.valor}`}
+                        title="Quitar el valor. Si ya se uso en registros, preferible desactivarlo."
+                        icono={<IconEliminar size={15} />}
+                        onClick={() =>
+                          setListaEnEdicion({
+                            ...listaEnEdicion,
+                            valores: listaEnEdicion.valores
+                              .filter((x) => x.valor !== v.valor)
+                              .map((x, k) => ({ ...x, orden: k + 1 })),
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                ))}
+            </div>
+
+            {listaEnEdicion.editable && (
+              <div className="hg-fila">
+                <input
+                  className="hg-input hg-input--sm"
+                  style={{ flex: 1 }}
+                  placeholder="Valor nuevo"
+                  aria-label="Valor nuevo"
+                  value={valorNuevo}
+                  onChange={(e) => setValorNuevo(e.target.value)}
+                />
+                <Button
+                  variante="secondary"
+                  tamano="sm"
+                  disabled={
+                    !valorNuevo.trim() ||
+                    listaEnEdicion.valores.some((v) => v.valor.toLowerCase() === valorNuevo.trim().toLowerCase())
+                  }
+                  onClick={() => {
+                    setListaEnEdicion({
+                      ...listaEnEdicion,
+                      valores: [
+                        ...listaEnEdicion.valores,
+                        { valor: valorNuevo.trim(), activo: true, orden: listaEnEdicion.valores.length + 1 },
+                      ],
+                    })
+                    setValorNuevo('')
+                  }}
+                >
+                  Agregar valor
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <ModalConfirmacion
+        abierto={confirmarReinicio}
+        titulo="Eliminar toda la informacion"
+        mensaje={
+          <>
+            Se eliminaran <strong>todos</strong> los proyectos, catalogos, usuarios y el registro de auditoria,
+            y se volveran a sembrar los datos de prueba. Esta accion no se puede deshacer y solo debe ejecutarse
+            en entornos de desarrollo o demostracion.
+          </>
+        }
+        textoConfirmar="Si, eliminar todo"
+        onConfirmar={() => void reiniciar()}
+        onCerrar={() => setConfirmarReinicio(false)}
+      />
+
+      <p className="hg-t-xs hg-t-ter" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <IconCatalogo size={13} />
+        Los cambios de catalogo se aplican de inmediato a las validaciones y a los calculos de todos los
+        proyectos.
+      </p>
     </div>
   )
 }

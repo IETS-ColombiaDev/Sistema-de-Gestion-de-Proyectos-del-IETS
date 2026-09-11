@@ -8,8 +8,15 @@
  * de dos series, tooltip al pasar el cursor y vista de tabla equivalente.
  */
 
-import { useId, useMemo, useState, type ReactNode } from 'react'
-import { CATEGORICOS, ESTADO, TINTA, colorSerie, tonoSecuencial } from './paleta'
+import { Fragment, useId, useMemo, useState, type ReactNode } from 'react'
+import { ESTADO, TINTA, colorSerie, tintaSobre } from './paleta'
+import type {
+  BarraDivergente,
+  LineaParetoVista,
+  PasoCascadaVista,
+  PuntoCuadrante,
+  PuntoCurvaS,
+} from './avanzados'
 import { IconTablero } from '../icons'
 
 // ---------------------------------------------------------------------------
@@ -26,7 +33,7 @@ export function Figura({
 }: {
   titulo?: string
   descripcion?: string
-  leyenda?: { etiqueta: string; color: string }[]
+  leyenda?: { etiqueta: string; color: string; discontinua?: boolean }[]
   tabla?: ReactNode
   children: ReactNode
   acciones?: ReactNode
@@ -85,10 +92,25 @@ export function Figura({
               key={l.etiqueta}
               style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-xs)', color: TINTA.secundaria }}
             >
-              <span
-                aria-hidden="true"
-                style={{ width: 10, height: 10, borderRadius: 3, background: l.color, flex: 'none' }}
-              />
+              {/* La muestra reproduce el trazo real: una serie discontinua se
+                  representa discontinua, no con un cuadro macizo del mismo
+                  color, que la haria indistinguible de la serie solida. */}
+              {l.discontinua ? (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 16,
+                    height: 0,
+                    borderTop: `2px dashed ${l.color}`,
+                    flex: 'none',
+                  }}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  style={{ width: 10, height: 10, borderRadius: 3, background: l.color, flex: 'none' }}
+                />
+              )}
               {l.etiqueta}
             </li>
           ))}
@@ -267,7 +289,7 @@ export function BarraApilada({ segmentos, total }: { segmentos: Segmento[]; tota
                 opacity: activo == null || activo === i ? 1 : 0.6,
                 display: 'grid',
                 placeItems: 'center',
-                color: '#fff',
+                color: tintaSobre(s.color),
                 fontSize: 'var(--fs-xs)',
                 fontWeight: 700,
                 minWidth: 2,
@@ -381,8 +403,16 @@ export function LineasTemporales({
           )
         })}
 
-        {/* Series */}
-        {series.map((s, si) => {
+        {/* Series.
+            Las lineas discontinuas se dibujan al final: cuando dos series casi
+            coinciden —lo programado y lo ejecutado, por ejemplo— la de
+            referencia debe quedar visible por encima, no tapada. El indice de
+            color se conserva para que el color siga a la serie y no a su orden
+            de pintado. */}
+        {series
+          .map((s, si) => ({ s, si }))
+          .sort((a, b) => Number(a.s.discontinua ?? false) - Number(b.s.discontinua ?? false))
+          .map(({ s, si }) => {
           const color = s.color ?? colorSerie(si)
           const puntos = etiquetasX
             .map((x, i) => {
@@ -497,9 +527,8 @@ export function MapaCalor({
       {matriz.map((fila, r) => {
         const probabilidad = 5 - r
         return (
-          <>
+          <Fragment key={`fila-${r}`}>
             <div
-              key={`lab-${r}`}
               className="hg-t-xs hg-t-num"
               style={{ display: 'grid', placeItems: 'center', color: TINTA.tenue, paddingRight: 6 }}
             >
@@ -532,7 +561,7 @@ export function MapaCalor({
                 </button>
               )
             })}
-          </>
+          </Fragment>
         )
       })}
       <div />
@@ -591,4 +620,34 @@ export function BarraMeta({
   )
 }
 
-export { CATEGORICOS, ESTADO, TINTA, colorSerie, tonoSecuencial }
+export {
+  CATEGORICOS,
+  DIVERGENTE,
+  ESTADO,
+  RELLENO_RECURSO,
+  RELLENO_RIESGO,
+  SECUENCIAL_INDIGO,
+  SERIE_EVM,
+  TINTA,
+  colorSerie,
+  tintaSobre,
+  tonoDivergente,
+  tonoSecuencial,
+} from './paleta'
+
+export {
+  BarrasDivergentes,
+  Bullet,
+  Cascada,
+  Cuadrante,
+  CurvaS,
+  Pareto,
+  Sparkline,
+} from './avanzados'
+export type {
+  BarraDivergente,
+  LineaParetoVista,
+  PasoCascadaVista,
+  PuntoCuadrante,
+  PuntoCurvaS,
+}

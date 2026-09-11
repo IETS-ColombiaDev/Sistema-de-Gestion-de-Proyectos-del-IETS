@@ -5,7 +5,7 @@
  * servidor: se derivan de las reglas RN-01 a RN-05 y RN-17.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Card from '@/components/Card'
 import Button from '@/components/Button'
@@ -15,6 +15,7 @@ import Progreso from '@/components/Progreso'
 import Modal, { ModalConfirmacion } from '@/components/ui/Modal'
 import { Input, Select, Textarea } from '@/components/ui/Field'
 import { Cargando, Vacio } from '@/components/EstadoVista'
+import { Pista } from '@/components/Ayuda'
 import { useToast } from '@/components/Toast'
 import {
   IconCronograma,
@@ -228,8 +229,8 @@ export default function Cronograma() {
     const editado = avancesEditados[a.id] != null
     return (
       <tr key={a.id} className={a.estado === 'Retrasada' ? 'hg-fila--critica' : undefined}>
-        <td className="hg-num hg-t-ter">{a.numero}</td>
-        <td>
+        <td className="hg-num hg-t-ter" data-etiqueta="#">{a.numero}</td>
+        <td data-etiqueta="Actividad">
           <div style={{ minWidth: 240 }}>
             <span className="hg-t-sm">{a.nombre}</span>
             {a.esCritica && (
@@ -248,11 +249,12 @@ export default function Cronograma() {
             )}
           </div>
         </td>
-        <td className="hg-t-sm">{a.responsableNombre || '—'}</td>
-        <td className="hg-t-sm">{formatearFecha(a.fechaInicio)}</td>
-        <td className="hg-t-sm">{formatearFecha(a.fechaFin)}</td>
+        <td className="hg-t-sm" data-etiqueta="Responsable">{a.responsableNombre || '—'}</td>
+        <td className="hg-t-sm" data-etiqueta="Inicio">{formatearFecha(a.fechaInicio)}</td>
+        <td className="hg-t-sm" data-etiqueta="Fin">{formatearFecha(a.fechaFin)}</td>
         <td
           className="hg-num"
+          data-etiqueta="Dias"
           title={
             proyecto.modoCalculo === 'saneado'
               ? 'Dias habiles reales, excluyendo fines de semana y festivos.'
@@ -261,7 +263,7 @@ export default function Cronograma() {
         >
           {a.duracion || '—'}
         </td>
-        <td style={{ minWidth: 150 }}>
+        <td style={{ minWidth: 150 }} data-etiqueta="Avance">
           {puedeAvance ? (
             <div className="hg-fila" style={{ gap: 6, flexWrap: 'nowrap' }}>
               <input
@@ -288,13 +290,13 @@ export default function Cronograma() {
             <Progreso valor={a.avance} meta={a.avanceEsperado} etiqueta />
           )}
         </td>
-        <td className="hg-num hg-t-ter" title="Avance que la programacion esperaba a la fecha de corte.">
+        <td className="hg-num hg-t-ter" data-etiqueta="Esperado" title="Avance que la programacion esperaba a la fecha de corte.">
           {a.avanceEsperado.toFixed(0)} %
         </td>
-        <td>
+        <td data-etiqueta="Estado">
           <BadgeEstado familia="actividad" valor={a.estado} titulo={a.razonEstado} />
         </td>
-        <td className="hg-num" title="Holgura en dias habiles, calculada sobre las dependencias declaradas.">
+        <td className="hg-num" data-etiqueta="Holgura" title="Holgura en dias habiles, calculada sobre las dependencias declaradas.">
           {a.holgura == null ? '—' : a.holgura}
         </td>
         <td className="no-print">
@@ -338,7 +340,7 @@ export default function Cronograma() {
       )}
 
       {hayAvancesPendientes && (
-        <div className="hg-banner no-print" role="status">
+        <div className="hg-banner hg-banner--fijo no-print" role="status">
           <strong>{Object.keys(avancesEditados).length} avance(s) sin guardar.</strong>
           Los estados se recalculan al guardar.
           <span className="hg-sep" />
@@ -455,7 +457,7 @@ export default function Cronograma() {
           />
         ) : (
           <div className="hg-tabla-wrap">
-            <table className="hg-tabla">
+            <table className="hg-tabla hg-tabla--responsiva">
               <thead>
                 <tr>
                   <th style={{ width: 44 }}>#</th>
@@ -463,18 +465,38 @@ export default function Cronograma() {
                   <th>Responsable</th>
                   <th style={{ width: 108 }}>Inicio</th>
                   <th style={{ width: 108 }}>Fin</th>
-                  <th className="hg-num" style={{ width: 70 }} title="Campo calculado">
-                    Dias
+                  <th className="hg-num" style={{ width: 78 }}>
+                    Dias{' '}
+                    <Pista
+                      etiqueta="Como se calcula la duracion"
+                      texto={
+                        proyecto.modoCalculo === 'saneado'
+                          ? 'Campo calculado: dias habiles entre inicio y fin, excluyendo sabados, domingos y los festivos del catalogo. Es el peso de la actividad en el avance ponderado.'
+                          : 'Campo calculado en modo compatibilidad: fin − inicio − 2, tal como lo hacia el libro Excel pese al rotulo "dias habiles".'
+                      }
+                    />
                   </th>
                   <th style={{ width: 160 }}>Avance</th>
-                  <th className="hg-num" style={{ width: 84 }} title="Campo calculado">
-                    Esperado
+                  <th className="hg-num" style={{ width: 96 }}>
+                    Esperado{' '}
+                    <Pista
+                      etiqueta="Como se calcula el avance esperado"
+                      texto="Campo calculado: porcentaje que la programacion preveia para esta actividad a la fecha de corte. Una actividad vencida espera 100 %; una en curso, la fraccion de duracion transcurrida."
+                    />
                   </th>
-                  <th style={{ width: 120 }} title="Campo calculado">
-                    Estado
+                  <th style={{ width: 128 }}>
+                    Estado{' '}
+                    <Pista
+                      etiqueta="Como se determina el estado"
+                      texto="Campo calculado y no editable. Completada si el avance llega a 100 %; Retrasada si la fecha de corte paso la fecha fin sin llegar al 100 %; En curso si el corte esta dentro de la ventana; Pendiente si aun no inicia."
+                    />
                   </th>
-                  <th className="hg-num" style={{ width: 78 }} title="Campo calculado">
-                    Holgura
+                  <th className="hg-num" style={{ width: 92 }}>
+                    Holgura{' '}
+                    <Pista
+                      etiqueta="Como se calcula la holgura"
+                      texto="Campo calculado: dias habiles que la actividad puede retrasarse sin desplazar el fin del proyecto, segun las predecesoras declaradas. Holgura cero significa ruta critica."
+                    />
                   </th>
                   <th className="no-print" style={{ width: 84 }} />
                 </tr>
@@ -484,9 +506,8 @@ export default function Cronograma() {
                   const colapsada = colapsadas.has(fase.id)
                   const avanceFase = resumen.porFase.find((p) => p.faseId === fase.id)
                   return (
-                    <>
+                    <Fragment key={`grupo-${fase.id}`}>
                       <tr
-                        key={`fase-${fase.id}`}
                         className="hg-fila--grupo"
                         onClick={() =>
                           setColapsadas((prev) => {
@@ -516,16 +537,16 @@ export default function Cronograma() {
                         <td colSpan={3} />
                       </tr>
                       {!colapsada && actividades.map(filaActividad)}
-                    </>
+                    </Fragment>
                   )
                 })}
                 {sinFase.length > 0 && (
-                  <>
+                  <Fragment key="grupo-sin-fase">
                     <tr className="hg-fila--grupo">
                       <td colSpan={11}>Sin fase asignada</td>
                     </tr>
                     {sinFase.map(filaActividad)}
-                  </>
+                  </Fragment>
                 )}
               </tbody>
             </table>

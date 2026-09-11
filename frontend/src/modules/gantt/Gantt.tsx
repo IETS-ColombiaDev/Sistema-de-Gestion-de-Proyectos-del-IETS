@@ -31,6 +31,8 @@ import {
   sumarDias,
 } from '@/domain/fechas'
 import { estadoColors } from '@/styles/theme'
+import { tintaSobre } from '@/components/charts/paleta'
+import { esMovil, esTableta, useMedia } from '@/lib/useMedia'
 import type { ActividadCalculada, ISODate } from '@/domain/types'
 
 type Resolucion = 'semana' | 'mes'
@@ -42,11 +44,26 @@ interface Periodo {
   grupo: string
 }
 
-const ANCHO_ETIQUETAS = 300
+/**
+ * Ancho de la columna de nombres. En un telefono, 300px no dejarian sitio para
+ * la linea de tiempo, que es el contenido que importa aqui.
+ */
+const ANCHO_ETIQUETAS_ESCRITORIO = 300
+const ANCHO_ETIQUETAS_TABLETA = 210
+const ANCHO_ETIQUETAS_MOVIL = 132
 
 export default function Gantt() {
   const { datos, resumen, cargando } = useProyecto()
-  const [resolucion, setResolucion] = useState<Resolucion>('semana')
+  const movil = useMedia(esMovil)
+  const tableta = useMedia(esTableta)
+  const ANCHO_ETIQUETAS = movil
+    ? ANCHO_ETIQUETAS_MOVIL
+    : tableta
+      ? ANCHO_ETIQUETAS_TABLETA
+      : ANCHO_ETIQUETAS_ESCRITORIO
+
+  // En movil la escala mensual entra mejor en pantalla que la semanal.
+  const [resolucion, setResolucion] = useState<Resolucion>(movil ? 'mes' : 'semana')
   const [zoom, setZoom] = useState(1)
   const contenedor = useRef<HTMLDivElement>(null)
 
@@ -99,7 +116,7 @@ export default function Gantt() {
     return out
   }, [rango, resolucion])
 
-  const anchoPeriodo = (resolucion === 'semana' ? 34 : 76) * zoom
+  const anchoPeriodo = (resolucion === 'semana' ? 34 : movil ? 60 : 76) * zoom
 
   const filas = useMemo(() => {
     if (!proyecto || !resumen) return []
@@ -430,7 +447,9 @@ Estado: ${a.estado} — ${a.razonEstado}`}
                           right: 4,
                           fontSize: 9,
                           fontWeight: 700,
-                          color: a.avance > 55 ? '#fff' : colores.fg,
+                          // Sobre el relleno cuando la barra esta mayormente llena;
+                          // sobre el fondo suave cuando no.
+                          color: a.avance > 55 ? tintaSobre(colores.bar) : colores.fg,
                         }}
                       >
                         {a.avance}%

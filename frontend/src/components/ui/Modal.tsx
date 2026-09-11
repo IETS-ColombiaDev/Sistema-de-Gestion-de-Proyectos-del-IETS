@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Button from '../Button'
 import { IconCerrar } from '../icons'
 
@@ -29,13 +30,24 @@ export default function Modal({
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
+  /**
+   * `onCerrar` llega casi siempre como una funcion en linea, de modo que su
+   * identidad cambia en cada render. Si el efecto de foco dependiera de ella,
+   * se reejecutaria con cada pulsacion de tecla: colocaria el foco de nuevo en
+   * el primer control y el usuario perderia todo lo escrito despues del primer
+   * caracter. Se guarda en una referencia para que el efecto se ejecute solo
+   * al abrir y al cerrar.
+   */
+  const onCerrarRef = useRef(onCerrar)
+  onCerrarRef.current = onCerrar
+
   useEffect(() => {
     if (!abierto) return
     const previo = document.activeElement as HTMLElement | null
     const alTeclear = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onCerrar()
+        onCerrarRef.current()
         return
       }
       if (e.key !== 'Tab' || !ref.current) return
@@ -56,24 +68,42 @@ export default function Modal({
     document.addEventListener('keydown', alTeclear)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    // El primer control del modal recibe el foco al abrir.
+    // Al abrir, el foco va al primer campo editable —no al boton de cerrar, que
+    // en el arbol aparece antes: querySelector devuelve el primero en orden de
+    // documento, no el primero de la lista de selectores. El boton solo recibe
+    // el foco cuando el modal no tiene ningun campo, como en una confirmacion.
+    // preventScroll evita que el navegador desplace el overlay y esconda la
+    // cabecera del modal.
     window.setTimeout(() => {
-      ref.current
-        ?.querySelector<HTMLElement>(
-          'input:not([type="hidden"]):not([disabled]), select, textarea, button',
-        )
-        ?.focus()
+      const cuerpo = ref.current?.querySelector('.hg-modal__body') ?? ref.current
+      const campo = cuerpo?.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled])',
+      )
+      const alternativa = ref.current?.querySelector<HTMLElement>(
+        '.hg-modal__pie button:not([disabled])',
+      )
+      ;(campo ?? alternativa)?.focus({ preventScroll: true })
     }, 30)
     return () => {
       document.removeEventListener('keydown', alTeclear)
       document.body.style.overflow = overflow
       previo?.focus?.()
     }
-  }, [abierto, onCerrar])
+    // Deliberadamente solo depende de `abierto`: ver la nota sobre onCerrarRef.
+  }, [abierto])
 
   if (!abierto) return null
 
-  return (
+  /**
+   * El modal se monta en document.body mediante portal.
+   *
+   * Motivo concreto: el area de contenido lleva una animacion de entrada, y una
+   * animacion crea contexto de apilamiento. Renderizado en linea, el overlay
+   * quedaria atrapado dentro de ese contexto y la cabecera sticky de la
+   * aplicacion se pintaria por encima del modal, por mucho z-index que se le
+   * pusiera. El portal lo saca del arbol de apilamiento del modulo.
+   */
+  return createPortal(
     <div
       className="hg-overlay no-print"
       onMouseDown={(e) => {
@@ -103,7 +133,8 @@ export default function Modal({
         <div className="hg-modal__body">{children}</div>
         {pie && <footer className="hg-modal__pie">{pie}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

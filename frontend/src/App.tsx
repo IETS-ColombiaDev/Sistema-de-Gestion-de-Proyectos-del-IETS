@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/auth/AuthContext'
 import { ToastProvider } from '@/components/Toast'
 import { Cargando } from '@/components/EstadoVista'
+import LimiteError from '@/components/LimiteError'
 import LayoutGlobal from '@/app/LayoutGlobal'
 import LayoutProyecto from '@/app/LayoutProyecto'
 import { ProyectoProvider } from '@/app/ProyectoContext'
@@ -24,6 +25,7 @@ const Productos = lazy(() => import('@/modules/productos/Productos'))
 const Satisfaccion = lazy(() => import('@/modules/satisfaccion/Satisfaccion'))
 const Presupuesto = lazy(() => import('@/modules/presupuesto/Presupuesto'))
 const Indicadores = lazy(() => import('@/modules/indicadores/Indicadores'))
+const Costos = lazy(() => import('@/modules/costos/Costos'))
 const Tablero = lazy(() => import('@/modules/tablero/Tablero'))
 const DashboardEjecutivo = lazy(() => import('@/modules/dashboard/DashboardEjecutivo'))
 const AuditoriaProyecto = lazy(() => import('@/modules/auditoria/AuditoriaProyecto'))
@@ -86,6 +88,7 @@ function Rutas() {
           <Route path="satisfaccion" element={<Satisfaccion />} />
           <Route path="presupuesto" element={<Presupuesto />} />
           <Route path="indicadores" element={<Indicadores />} />
+          <Route path="costos" element={<Costos />} />
           <Route path="auditoria" element={<AuditoriaProyecto />} />
           <Route path="importacion" element={<Importacion />} />
         </Route>
@@ -115,12 +118,16 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <Rutas />
-        </AuthProvider>
-      </ToastProvider>
-    </BrowserRouter>
+    <LimiteError ambito="la aplicacion">
+      {/* Se activan las banderas de la version 7 del enrutador: evita las
+          advertencias de consola y deja el codigo listo para la actualizacion. */}
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ToastProvider>
+          <AuthProvider>
+            <Rutas />
+          </AuthProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </LimiteError>
   )
 }

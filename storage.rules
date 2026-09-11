@@ -1,0 +1,66 @@
+rules_version = '2';
+
+/**
+ * Reglas de Cloud Storage — evidencias de hitos y productos (HG-076, HG-098).
+ *
+ * Los archivos se guardan bajo proyectos/{proyectoId}/... El acceso se decide
+ * por la pertenencia al proyecto, con control de tipo y de tamano en el propio
+ * servidor: la validacion del navegador es una cortesia, no una barrera.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function dominioInstitucional() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.matches('.*@iets[.]org[.]co$');
+    }
+
+    function esAdministrador() {
+      return dominioInstitucional() && request.auth.token.rol == 'administrador';
+    }
+
+    function tipoPermitido() {
+      return request.resource.contentType.matches('application/pdf')
+        || request.resource.contentType.matches('image/(png|jpeg)')
+        || request.resource.contentType.matches('text/csv')
+        || request.resource.contentType.matches(
+             'application/vnd.openxmlformats-officedocument.*'
+           );
+    }
+
+    function tamanoPermitido() {
+      return request.resource.size < 20 * 1024 * 1024; // 20 MB
+    }
+
+    match /proyectos/{proyectoId}/{ruta=**} {
+      // La pertenencia al proyecto se verifica contra el documento de Firestore.
+      allow read: if dominioInstitucional()
+        && (esAdministrador()
+            || firestore.get(/databases/(default)/documents/proyectos/$(proyectoId))
+                 .data.accesos[request.auth.uid] != null);
+
+      allow write: if dominioInstitucional()
+        && tipoPermitido()
+        && tamanoPermitido()
+        && (esAdministrador()
+            || firestore.get(/databases/(default)/documents/proyectos/$(proyectoId))
+                 .data.accesos[request.auth.uid] in ['lider', 'gestor', 'miembro']);
+
+      // Las evidencias no se borran: se reemplazan por una version nueva y la
+      // anterior queda referenciada en la auditoria.
+      allow delete: if esAdministrador();
+    }
+
+    match /exportables/{usuarioUid}/{archivo} {
+      // Cada usuario descarga solo lo que el servidor genero para el.
+      allow read: if dominioInstitucional() && request.auth.uid == usuarioUid;
+      allow write: if false; // los genera Cloud Functions
+    }
+
+    match /{ruta=**} {
+      allow read, write: if false;
+    }
+  }
+}

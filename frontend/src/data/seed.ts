@@ -10,11 +10,13 @@
 import { nuevoId, rutas, type DocumentoBase } from './adapter'
 import { obtenerAdaptador } from './backend'
 import { LISTAS_POR_DEFECTO, PARAMETROS_POR_DEFECTO } from '@/domain/catalogos'
-import { CATALOGO_INDICADORES } from '@/domain/indicadores'
-import { hoyISO, sumarDias, sumarMeses } from '@/domain/fechas'
+import { CATALOGO_INDICADORES, calcularIndicadores } from '@/domain/indicadores'
+import { resumirProyecto } from '@/domain/reglas'
+import { diffDias, hoyISO, sumarDias, sumarMeses } from '@/domain/fechas'
 import type {
   Actividad,
   AsignacionRaci,
+  DatosProyecto,
   Fase,
   Hito,
   MedicionSatisfaccion,
@@ -24,6 +26,7 @@ import type {
   Recurso,
   RegistroPresupuestal,
   Riesgo,
+  Snapshot,
   Usuario,
 } from '@/domain/types'
 
@@ -235,14 +238,18 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   await ad.guardar(rutas.proyectos(), proyecto as unknown as DocumentoBase)
 
   // --- Equipo ---
+  // Las tarifas hora permiten contrastar el libro presupuestal con el costo
+  // teorico de la dedicacion declarada. Son valores de referencia sinteticos.
   const equipo: MiembroEquipo[] = [
-    { perfil: 'Lider de proyecto', nombre: 'Lider de proyecto', usuarioUid: 'u-lider', dedicacionHorasMes: 60, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false },
-    { perfil: 'Gestor de proyecto', nombre: 'Gestora de proyecto', usuarioUid: 'u-gestor', dedicacionHorasMes: 120, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false },
-    { perfil: 'Analista de evaluacion', nombre: 'Analista de evaluacion', usuarioUid: 'u-miembro', dedicacionHorasMes: 160, mesesVinculacion: 11, estadoVinculacion: 'Contratado', porDesignar: false },
-    { perfil: 'Metodologa', nombre: 'Metodologa', usuarioUid: null, dedicacionHorasMes: 80, mesesVinculacion: 9, estadoVinculacion: 'Contratado', porDesignar: false },
-    { perfil: 'Economista de la salud', nombre: 'Economista de la salud', usuarioUid: null, dedicacionHorasMes: 100, mesesVinculacion: 7, estadoVinculacion: 'Confirmado', porDesignar: false },
-    { perfil: 'Especialista en informacion', nombre: 'Especialista en informacion', usuarioUid: null, dedicacionHorasMes: 40, mesesVinculacion: 4, estadoVinculacion: 'Contratado', porDesignar: false },
-    { perfil: 'Analista junior', nombre: 'Analista junior', usuarioUid: null, dedicacionHorasMes: 160, mesesVinculacion: 6, estadoVinculacion: 'Contactado', porDesignar: false },
+    { perfil: 'Lider de proyecto', nombre: 'Lider de proyecto', usuarioUid: 'u-lider', dedicacionHorasMes: 60, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 95_000 },
+    { perfil: 'Gestor de proyecto', nombre: 'Gestora de proyecto', usuarioUid: 'u-gestor', dedicacionHorasMes: 120, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 62_000 },
+    { perfil: 'Analista de evaluacion', nombre: 'Analista de evaluacion', usuarioUid: 'u-miembro', dedicacionHorasMes: 160, mesesVinculacion: 11, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 54_000 },
+    { perfil: 'Metodologa', nombre: 'Metodologa', usuarioUid: null, dedicacionHorasMes: 80, mesesVinculacion: 9, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 78_000 },
+    { perfil: 'Economista de la salud', nombre: 'Economista de la salud', usuarioUid: null, dedicacionHorasMes: 100, mesesVinculacion: 7, estadoVinculacion: 'Confirmado', porDesignar: false, costoHora: 82_000 },
+    { perfil: 'Especialista en informacion', nombre: 'Especialista en informacion', usuarioUid: null, dedicacionHorasMes: 40, mesesVinculacion: 4, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 48_000 },
+    { perfil: 'Analista junior', nombre: 'Analista junior', usuarioUid: null, dedicacionHorasMes: 160, mesesVinculacion: 6, estadoVinculacion: 'Contactado', porDesignar: false, costoHora: 32_000 },
+    // La editora queda sin tarifa a proposito: el tablero debe declarar que el
+    // costo teorico del equipo esta incompleto, no fingir que no lo esta.
     { perfil: 'Editora', nombre: '', usuarioUid: null, dedicacionHorasMes: 30, mesesVinculacion: 3, estadoVinculacion: 'Por definir', porDesignar: true },
   ].map((m, i) => ({
     id: `eq${i + 1}`,
@@ -305,22 +312,43 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   })) as Hito[]
   await ad.guardarLote(rutas.hitos(proyectoId), hitos as unknown as DocumentoBase[])
 
-  // --- RACI: A unica por actividad, R por responsable ---
+  // --- Matriz RACI ---
+  // Cada celda (actividad x persona) sostiene UNA letra. Por eso el ejecutor y
+  // el responsable final nunca son la misma persona en la misma actividad:
+  // cuando el lider es el responsable de ejecutar, la A recae en el gestor.
   const raci: AsignacionRaci[] = []
   const idLider = idPorNombre.get('Lider de proyecto')!
   const idGestor = idPorNombre.get('Gestora de proyecto')!
+  const idMetodologa = idPorNombre.get('Metodologa')!
+
+  const asignar = (actividadId: string, miembroId: string, letra: AsignacionRaci['letra']) => {
+    if (raci.some((r) => r.actividadId === actividadId && r.miembroId === miembroId)) return
+    raci.push({
+      id: nuevoId('raci'),
+      proyectoId,
+      ...meta('u-lider'),
+      actividadId,
+      miembroId,
+      letra,
+    })
+  }
+
   actividades.forEach((act, i) => {
-    if (act.responsableId) {
-      raci.push({ id: nuevoId('raci'), proyectoId, ...meta('u-lider'), actividadId: act.id, miembroId: act.responsableId, letra: 'R' })
-    }
-    // Una sola A: el lider, salvo en dos actividades que se dejan sin A para
-    // ejercitar el panel de integridad RN-14.
-    if (i !== 11 && i !== 19) {
-      raci.push({ id: nuevoId('raci'), proyectoId, ...meta('u-lider'), actividadId: act.id, miembroId: idLider, letra: 'A' })
-    }
-    if (i % 3 === 0) {
-      raci.push({ id: nuevoId('raci'), proyectoId, ...meta('u-lider'), actividadId: act.id, miembroId: idGestor, letra: 'C' })
-    }
+    const ejecutor = act.responsableId ?? idGestor
+    asignar(act.id, ejecutor, 'R')
+
+    // La A recae en el lider; si el lider ya es el ejecutor, pasa al gestor y,
+    // si tambien coincide, a la metodologa.
+    const candidatosA = [idLider, idGestor, idMetodologa]
+    const responsableFinal = candidatosA.find((id) => id !== ejecutor)!
+
+    // Dos actividades se dejan deliberadamente sin A para que el panel de
+    // integridad RN-14 tenga casos que reportar en la demostracion.
+    if (i !== 11 && i !== 19) asignar(act.id, responsableFinal, 'A')
+
+    // Consultados e informados, para que la matriz no quede binaria.
+    if (i % 3 === 0) asignar(act.id, idMetodologa, 'C')
+    if (i % 4 === 0) asignar(act.id, idLider === ejecutor ? idGestor : idLider, 'I')
   })
   await ad.guardarLote(rutas.raci(proyectoId), raci as unknown as DocumentoBase[])
 
@@ -462,56 +490,286 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   })) as RegistroPresupuestal[]
   await ad.guardarLote(rutas.presupuesto(proyectoId), presupuesto as unknown as DocumentoBase[])
 
-  // --- Segundo proyecto, para que el portafolio tenga sentido ---
-  const p2Id = 'pry-guia'
-  const inicio2 = sumarDias(hoy, -60)
-  const proyecto2: Proyecto = {
-    ...proyecto,
-    id: p2Id,
-    codigo: 'GPC-2026-002',
-    nombre: 'Guia de practica clinica — condicion de referencia',
-    tecnologiaObjeto: 'Guia de practica clinica basada en evidencia',
-    alcance: 'Elaboracion de recomendaciones clinicas basadas en evidencia para la condicion de referencia.',
-    objetivoGeneral: 'Formular recomendaciones clinicas basadas en la mejor evidencia disponible.',
-    objetivosEspecificos: [
-      { id: 'oe1', orden: 1, texto: 'Priorizar las preguntas clinicas con el grupo desarrollador.' },
-      { id: 'oe2', orden: 2, texto: 'Formular recomendaciones graduadas segun la certeza de la evidencia.' },
-    ],
-    productosComprometidos: [{ id: 'pc1', orden: 1, nombre: 'Guia de practica clinica' }],
-    fechaInicio: inicio2,
-    fechaEntregaFinal: sumarDias(inicio2, 300),
-    fechaCorte: hoy,
-    estado: 'activo',
-    presupuestoTotal: 320_000_000,
-    accesos: { 'u-lider': 'lider', 'u-gestor': 'gestor' },
-    recalculoPendiente: true,
+  // -------------------------------------------------------------------------
+  // Instantaneas historicas
+  // -------------------------------------------------------------------------
+  // Se generan ejecutando el motor real en fechas de corte pasadas, no
+  // inventando una curva: la trayectoria del valor ganado que muestra el
+  // tablero es la que el sistema habria registrado si se hubiera recalculado
+  // en cada uno de esos cortes.
+  const generarInstantaneas = async (
+    datosProyecto: DatosProyecto,
+    cortes: string[],
+  ): Promise<void> => {
+    const instantaneas: Snapshot[] = []
+    for (const fechaCorte of cortes) {
+      const enEseCorte: DatosProyecto = {
+        ...datosProyecto,
+        proyecto: { ...datosProyecto.proyecto, fechaCorte },
+        // El avance registrado a una fecha pasada no puede superar lo que la
+        // programacion preveia para entonces: una actividad no se completa
+        // antes de empezar. Se acota con el avance planeado de esa fecha.
+        actividades: datosProyecto.actividades.map((a) => {
+          if (!a.fechaInicio || !a.fechaFin) return a
+          if (fechaCorte < a.fechaInicio) return { ...a, avance: 0 }
+          if (fechaCorte >= a.fechaFin) return a
+          const total = Math.max(1, diffDias(a.fechaInicio, a.fechaFin))
+          const transcurrido = Math.max(0, diffDias(a.fechaInicio, fechaCorte))
+          const techo = Math.round((transcurrido / total) * 100)
+          return { ...a, avance: Math.min(a.avance, techo) }
+        }),
+        presupuesto: datosProyecto.presupuesto.filter(
+          (r) => r.periodo <= fechaCorte.slice(0, 7),
+        ),
+      }
+      const resumenCorte = resumirProyecto(enEseCorte, PARAMETROS_POR_DEFECTO)
+      instantaneas.push({
+        id: fechaCorte,
+        proyectoId: datosProyecto.proyecto.id,
+        fechaCorte,
+        creadoEn: new Date(`${fechaCorte}T09:00:00.000Z`).toISOString(),
+        creadoPor: 'u-gestor',
+        indicadores: calcularIndicadores(enEseCorte, resumenCorte),
+        avancePonderado: resumenCorte.avancePonderado,
+        avanceEsperado: resumenCorte.avanceEsperado,
+        avanceSimple: resumenCorte.avanceSimple,
+        desviacion: resumenCorte.desviacion.puntos,
+        actividadesPorEstado: Object.fromEntries(
+          resumenCorte.distribucion.map((d) => [d.estado || 'Sin estado', d.conteo]),
+        ),
+        riesgosPorNivel: resumenCorte.riesgos.reduce<Record<string, number>>((acc, r) => {
+          if (r.nivel) acc[r.nivel] = (acc[r.nivel] ?? 0) + 1
+          return acc
+        }, {}),
+      })
+    }
+    await ad.guardarLote(
+      rutas.snapshots(datosProyecto.proyecto.id),
+      instantaneas as unknown as DocumentoBase[],
+    )
   }
-  await ad.guardar(rutas.proyectos(), proyecto2 as unknown as DocumentoBase)
 
-  const actividades2: Actividad[] = PLANTILLA.slice(0, 12).map((p, i) => ({
-    id: `p2act${String(i + 1).padStart(3, '0')}`,
-    proyectoId: p2Id,
-    ...meta('u-gestor'),
-    numero: i + 1,
-    orden: i + 1,
-    faseId: `f${p.fase}`,
-    nombre: p.nombre,
-    responsableId: null,
-    responsableNombre: p.responsable,
-    apoyoIds: [],
-    fechaInicio: sumarDias(inicio2, Math.round(p.offsetInicio * 0.6)),
-    fechaFin: sumarDias(inicio2, Math.round((p.offsetInicio + p.duracion) * 0.6)),
-    avance: Math.max(0, p.avance - 25),
-    predecesoras: [],
-  }))
-  await ad.guardarLote(rutas.actividades(p2Id), actividades2 as unknown as DocumentoBase[])
+  // Cortes mensuales de los ultimos cinco meses, ademas del vigente.
+  const cortesPasados = [5, 4, 3, 2, 1].map((meses) => sumarMeses(hoy, -meses))
 
-  const riesgos2: Riesgo[] = riesgos.slice(0, 5).map((r, i) => ({
-    ...r,
-    id: `p2rsg${i + 1}`,
-    proyectoId: p2Id,
-  }))
-  await ad.guardarLote(rutas.riesgos(p2Id), riesgos2 as unknown as DocumentoBase[])
+  await generarInstantaneas(
+    {
+      proyecto,
+      equipo,
+      actividades,
+      hitos,
+      raci,
+      riesgos,
+      recursos,
+      productos,
+      satisfaccion,
+      presupuesto,
+    },
+    cortesPasados,
+  )
+
+  // -------------------------------------------------------------------------
+  // Proyectos adicionales del portafolio
+  // -------------------------------------------------------------------------
+  // Tres perfiles de desempeno distintos, para que el cuadrante del portafolio
+  // muestre lo que tiene que mostrar: que un proyecto sano, uno atrasado y uno
+  // en problemas de costo piden decisiones diferentes.
+  interface PerfilProyecto {
+    id: string
+    codigo: string
+    nombre: string
+    tecnologiaObjeto: string
+    alcance: string
+    financiador: string
+    presupuestoTotal: number
+    /** Meses transcurridos de la vigencia. */
+    mesesTranscurridos: number
+    /** Duracion total en dias. */
+    duracionDias: number
+    /** Cuanto del avance planeado se ha logrado, de 0 a 1. */
+    cumplimientoAvance: number
+    /** Cuanto se ha gastado frente al valor del trabajo hecho, de 0 a 1+. */
+    factorGasto: number
+    actividadesTomadas: number
+    riesgosTomados: number
+    estado: Proyecto['estado']
+  }
+
+  const perfiles: PerfilProyecto[] = [
+    {
+      id: 'pry-guia',
+      codigo: 'GPC-2026-002',
+      nombre: 'Guia de practica clinica — condicion de referencia',
+      tecnologiaObjeto: 'Guia de practica clinica basada en evidencia',
+      alcance:
+        'Elaboracion de recomendaciones clinicas basadas en evidencia para la condicion de referencia.',
+      financiador: 'Entidad contratante de referencia',
+      presupuestoTotal: 320_000_000,
+      mesesTranscurridos: 6,
+      duracionDias: 300,
+      cumplimientoAvance: 0.72,
+      factorGasto: 1.18,
+      actividadesTomadas: 16,
+      riesgosTomados: 6,
+      estado: 'activo',
+    },
+    {
+      id: 'pry-consulta',
+      codigo: 'CON-2026-003',
+      nombre: 'Consulta ciudadana sobre priorizacion en salud',
+      tecnologiaObjeto: 'Instrumento de consulta y analisis de preferencias',
+      alcance:
+        'Diseno, aplicacion y analisis de un instrumento de consulta a las partes interesadas del sistema.',
+      financiador: 'Cooperacion tecnica',
+      presupuestoTotal: 180_000_000,
+      mesesTranscurridos: 4,
+      duracionDias: 210,
+      cumplimientoAvance: 1.02,
+      factorGasto: 0.94,
+      actividadesTomadas: 12,
+      riesgosTomados: 4,
+      estado: 'activo',
+    },
+    {
+      id: 'pry-registro',
+      codigo: 'REG-2025-004',
+      nombre: 'Registro nacional de tecnologias evaluadas',
+      tecnologiaObjeto: 'Plataforma de registro y consulta publica',
+      alcance:
+        'Construccion del registro institucional de tecnologias evaluadas y su interfaz de consulta.',
+      financiador: 'Recursos propios',
+      presupuestoTotal: 540_000_000,
+      mesesTranscurridos: 9,
+      duracionDias: 330,
+      cumplimientoAvance: 0.61,
+      factorGasto: 1.34,
+      actividadesTomadas: 20,
+      riesgosTomados: 9,
+      estado: 'activo',
+    },
+  ]
+
+  for (const perfil of perfiles) {
+    const inicioP = sumarMeses(hoy, -perfil.mesesTranscurridos)
+    const factorTiempo = perfil.duracionDias / 264
+
+    const proyectoP: Proyecto = {
+      ...proyecto,
+      id: perfil.id,
+      ...meta('u-lider'),
+      codigo: perfil.codigo,
+      nombre: perfil.nombre,
+      tecnologiaObjeto: perfil.tecnologiaObjeto,
+      alcance: perfil.alcance,
+      objetivoGeneral: perfil.alcance,
+      objetivosEspecificos: [
+        { id: 'oe1', orden: 1, texto: 'Cumplir el alcance acordado con la entidad contratante.' },
+      ],
+      productosComprometidos: [{ id: 'pc1', orden: 1, nombre: 'Producto principal del proyecto' }],
+      financiador: perfil.financiador,
+      fechaInicio: inicioP,
+      fechaEntregaFinal: sumarDias(inicioP, perfil.duracionDias),
+      fechaCorte: hoy,
+      estado: perfil.estado,
+      presupuestoTotal: perfil.presupuestoTotal,
+      accesos: { 'u-lider': 'lider', 'u-gestor': 'gestor' },
+      recalculoPendiente: false,
+      recalculadoEn: AHORA,
+    }
+    await ad.guardar(rutas.proyectos(), proyectoP as unknown as DocumentoBase)
+
+    // Actividades escaladas al horizonte del proyecto. El avance de cada una se
+    // deriva del avance planeado a la fecha de corte por el factor de
+    // cumplimiento del perfil: asi el indice de cronograma sale del dato, no de
+    // un numero puesto a mano.
+    const actividadesP: Actividad[] = PLANTILLA.slice(0, perfil.actividadesTomadas).map((pl, i) => {
+      const inicioAct = sumarDias(inicioP, Math.round(pl.offsetInicio * factorTiempo))
+      const finAct = sumarDias(inicioP, Math.round((pl.offsetInicio + pl.duracion) * factorTiempo))
+      const planeado = hoy >= finAct ? 100 : hoy < inicioAct ? 0 : 55
+      return {
+        id: `${perfil.id}-act${String(i + 1).padStart(3, '0')}`,
+        proyectoId: perfil.id,
+        ...meta('u-gestor'),
+        numero: i + 1,
+        orden: i + 1,
+        faseId: `f${pl.fase}`,
+        nombre: pl.nombre,
+        entregable: pl.entregable,
+        responsableId: null,
+        responsableNombre: pl.responsable,
+        apoyoIds: [],
+        fechaInicio: inicioAct,
+        fechaFin: finAct,
+        avance: Math.max(0, Math.min(100, Math.round(planeado * perfil.cumplimientoAvance))),
+        predecesoras: [],
+      }
+    })
+    await ad.guardarLote(rutas.actividades(perfil.id), actividadesP as unknown as DocumentoBase[])
+
+    // Presupuesto mensual: el gasto se calibra con el factor del perfil sobre
+    // el valor del trabajo efectivamente hecho.
+    const resumenP = resumirProyecto(
+      {
+        proyecto: proyectoP,
+        equipo: [],
+        actividades: actividadesP,
+        hitos: [],
+        raci: [],
+        riesgos: [],
+        recursos: [],
+        productos: [],
+        satisfaccion: [],
+        presupuesto: [],
+      },
+      PARAMETROS_POR_DEFECTO,
+    )
+    const valorGanadoP = (perfil.presupuestoTotal * resumenP.avancePonderado) / 100
+    const gastoTotalP = valorGanadoP * perfil.factorGasto
+    const mesesGasto = Math.max(1, perfil.mesesTranscurridos)
+    const presupuestoP: RegistroPresupuestal[] = Array.from({ length: mesesGasto }, (_, k) => ({
+      id: `${perfil.id}-pre${k + 1}`,
+      proyectoId: perfil.id,
+      ...meta('u-lider'),
+      periodo: sumarMeses(hoy, -(mesesGasto - 1 - k)).slice(0, 7),
+      rubro: k % 3 === 0 ? 'Talento humano' : k % 3 === 1 ? 'Servicios profesionales' : 'Tecnologia',
+      fuente: perfil.financiador === 'Recursos propios' ? 'Recursos propios' : 'Convenio',
+      programado: Math.round(perfil.presupuestoTotal / (perfil.duracionDias / 30)),
+      ejecutado: Math.round(gastoTotalP / mesesGasto),
+      responsableNombre: 'Lider de proyecto',
+    }))
+    await ad.guardarLote(rutas.presupuesto(perfil.id), presupuestoP as unknown as DocumentoBase[])
+
+    const riesgosP: Riesgo[] = riesgos.slice(0, perfil.riesgosTomados).map((r, i) => ({
+      ...r,
+      id: `${perfil.id}-rsg${i + 1}`,
+      proyectoId: perfil.id,
+    }))
+    await ad.guardarLote(rutas.riesgos(perfil.id), riesgosP as unknown as DocumentoBase[])
+
+    const hitosP: Hito[] = hitos.slice(0, 6).map((h, i) => ({
+      ...h,
+      id: `${perfil.id}-hit${i + 1}`,
+      proyectoId: perfil.id,
+      fechaProgramada: sumarDias(inicioP, Math.round((i + 1) * (perfil.duracionDias / 7))),
+    }))
+    await ad.guardarLote(rutas.hitos(perfil.id), hitosP as unknown as DocumentoBase[])
+
+    await generarInstantaneas(
+      {
+        proyecto: proyectoP,
+        equipo: [],
+        actividades: actividadesP,
+        hitos: hitosP,
+        raci: [],
+        riesgos: riesgosP,
+        recursos: [],
+        productos: [],
+        satisfaccion: [],
+        presupuesto: presupuestoP,
+      },
+      cortesPasados.slice(-Math.min(cortesPasados.length, perfil.mesesTranscurridos)),
+    )
+  }
 
   localStorage.setItem(CLAVE_SEMBRADO, new Date().toISOString())
   return { proyectoId, actividades: actividades.length }

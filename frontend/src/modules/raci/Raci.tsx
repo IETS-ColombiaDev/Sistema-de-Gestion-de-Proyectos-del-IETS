@@ -22,6 +22,7 @@ import { IconExportar, IconRaci } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
 import { useAuth } from '@/auth/AuthContext'
 import { puedeEnProyecto } from '@/auth/permisos'
+import { asignacionesPorCelda } from '@/domain/reglas'
 import { eliminarEntidad, guardarEntidad } from '@/data/repo'
 import { rutas } from '@/data/adapter'
 import { exportarExcel } from '@/lib/exportar'
@@ -48,11 +49,8 @@ export default function Raci() {
   const [personaId, setPersonaId] = useState('')
   const [guardando, setGuardando] = useState(false)
 
-  const asignaciones = useMemo(() => {
-    const mapa = new Map<string, AsignacionRaci>()
-    for (const a of datos?.raci ?? []) mapa.set(`${a.actividadId}::${a.miembroId}`, a)
-    return mapa
-  }, [datos])
+  // Misma deduplicacion por celda que aplica el motor de reglas.
+  const asignaciones = useMemo(() => asignacionesPorCelda(datos?.raci ?? []), [datos])
 
   const actividades = useMemo(
     () => (resumen?.actividades ?? []).filter((a) => !a.vacia).sort((a, b) => a.orden - b.orden),

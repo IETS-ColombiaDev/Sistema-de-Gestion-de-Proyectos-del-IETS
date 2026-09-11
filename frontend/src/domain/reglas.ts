@@ -245,12 +245,23 @@ export function avancePonderado(acts: ActividadCalculada[]): number {
 // ---------------------------------------------------------------------------
 
 /**
+ * Avance que la programacion preveia a UNA fecha cualquiera.
+ *
+ * Es la misma regla RN-05, evaluada en una fecha arbitraria en lugar de en la
+ * fecha de corte. Existe como funcion propia para que la curva de valor
+ * planeado del tablero de costos y el indicador de avance esperado no puedan
+ * divergir: son la misma cuenta.
+ *
  * saneado: numerador y denominador en la MISMA unidad de duracion.
- *   - actividad vencida (corte >= fin)  -> aporta su duracion completa
+ *   - actividad vencida (fecha >= fin)  -> aporta su duracion completa
  *   - actividad en curso                -> aporta la fraccion de duracion transcurrida
  * compatibilidad: reproduce la mezcla de unidades del libro (D-02).
  */
-export function avanceEsperado(acts: ActividadCalculada[], ctx: ContextoCalculo): number {
+export function avancePlaneadoEnFecha(
+  acts: ActividadCalculada[],
+  fecha: ISODate,
+  ctx: ContextoCalculo,
+): number {
   const vigentes = acts.filter((a) => !a.vacia && a.duracion > 0)
   const denominador = vigentes.reduce((s, a) => s + a.duracion, 0)
   if (denominador === 0) return 0
@@ -260,16 +271,24 @@ export function avanceEsperado(acts: ActividadCalculada[], ctx: ContextoCalculo)
     const inicio = a.fechaInicio as ISODate
     const fin = a.fechaFin as ISODate
 
-    if (ctx.fechaCorte >= fin) {
+    if (fecha >= fin) {
       numerador += a.duracion
-    } else if (ctx.fechaCorte >= inicio) {
-      numerador +=
-        ctx.modo === 'compatibilidad'
-          ? diffDias(inicio, ctx.fechaCorte) + 1 // dias calendario: la mezcla heredada
-          : a.duracion * (a.avanceEsperado / 100)
+    } else if (fecha >= inicio) {
+      if (ctx.modo === 'compatibilidad') {
+        // Dias calendario: la mezcla de unidades heredada del libro.
+        numerador += diffDias(inicio, fecha) + 1
+      } else {
+        const transcurrido = ctx.calendario.diasHabiles(inicio, fecha)
+        numerador += Math.min(a.duracion, transcurrido)
+      }
     }
   }
   return redondear((numerador / denominador) * 100)
+}
+
+/** RN-05 · avance esperado a la fecha de corte del proyecto. */
+export function avanceEsperado(acts: ActividadCalculada[], ctx: ContextoCalculo): number {
+  return avancePlaneadoEnFecha(acts, ctx.fechaCorte, ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -490,15 +509,34 @@ export function mapaCalorRiesgos(riesgos: RiesgoCalculado[]): number[][] {
 /**
  * Exactamente una "A" por actividad. La alerta se aplica sobre el propio
  * conteo, no sobre la columna contigua (corrige D-13).
+ *
+ * Una celda de la matriz sostiene UNA sola letra: una persona no puede ser a la
+ * vez R y A de la misma actividad. Si los datos traen mas de una asignacion
+ * para el mismo par (actividad, persona) —por importacion o por migracion—
+ * prevalece la ultima actualizada, que es la misma regla que aplica la
+ * interfaz. Asi el panel de integridad y la matriz nunca informan cosas
+ * distintas sobre los mismos datos.
  */
+export function asignacionesPorCelda(asignaciones: AsignacionRaci[]): Map<string, AsignacionRaci> {
+  const mapa = new Map<string, AsignacionRaci>()
+  for (const a of asignaciones) {
+    if (a.eliminado) continue
+    const clave = `${a.actividadId}::${a.miembroId}`
+    const previa = mapa.get(clave)
+    if (!previa || (a.actualizadoEn ?? '') >= (previa.actualizadoEn ?? '')) mapa.set(clave, a)
+  }
+  return mapa
+}
+
 export function integridadRaci(
   actividades: Actividad[],
   asignaciones: AsignacionRaci[],
 ): IntegridadRaci[] {
+  const porCelda = [...asignacionesPorCelda(asignaciones).values()]
   return actividades
     .filter((a) => a.nombre?.trim())
     .map((act) => {
-      const propias = asignaciones.filter((x) => x.actividadId === act.id && !x.eliminado)
+      const propias = porCelda.filter((x) => x.actividadId === act.id)
       const conteoA = propias.filter((x) => x.letra === 'A').length
       const conteoR = propias.filter((x) => x.letra === 'R').length
       let problema = ''
@@ -766,8 +804,11 @@ export function estadoIndicador(
     return 'Critico'
   }
   if (valor <= meta) return 'Cumple'
-  // Con meta 0 la banda multiplicativa colapsa: se usa una tolerancia absoluta.
-  const limiteAtencion = meta === 0 ? factorMenor : meta * factorMenor
+  // Con meta 0 la banda multiplicativa colapsa (0 x factor = 0). Para una meta
+  // de cero se admite una sola unidad de holgura: un caso es atencion, dos ya
+  // es critico. Es la lectura correcta para indicadores de conteo como
+  // "riesgos criticos abiertos", cuya meta institucional es cero.
+  const limiteAtencion = meta === 0 ? 1 : meta * factorMenor
   if (valor <= limiteAtencion) return 'Atencion'
   return 'Critico'
 }
@@ -844,7 +885,8 @@ export function validarSatisfaccion(
 ): ProblemaValidacion[] {
   const out: ProblemaValidacion[] = []
   if (m.encuestados < 0 || m.satisfechos < 0) {
-    out.push({ campo: 'encuestados', mensaje: 'Los conteos no pueden ser negativos.', bloqueante: true })
+    // Un conteo negativo es el problema de raiz: no se acumula la comparacion.
+    return [{ campo: 'encuestados', mensaje: 'Los conteos no pueden ser negativos.', bloqueante: true }]
   }
   if (m.satisfechos > m.encuestados) {
     out.push({

@@ -71,6 +71,7 @@ export function navProyecto(proyectoId: string): GrupoNav[] {
         { ruta: `${b}/dashboard`, etiqueta: 'Dashboard ejecutivo', icono: <IconTablero /> },
         { ruta: `${b}/tablero`, etiqueta: 'Tablero de seguimiento', icono: <IconGantt />, contador: 'alertas' },
         { ruta: `${b}/indicadores`, etiqueta: 'Indicadores', icono: <IconIndicador /> },
+        { ruta: `${b}/costos`, etiqueta: 'Costos y valor ganado', icono: <IconPresupuesto /> },
       ],
     },
     {

@@ -21,15 +21,18 @@ import { useParams } from 'react-router-dom'
 import { construirAlertas } from '@/domain/alertas'
 import { calcularIndicadores } from '@/domain/indicadores'
 import { resumirProyecto, type ResumenProyecto } from '@/domain/reglas'
+import { analizarCostos, type AnalisisCostos } from '@/domain/evm'
 import {
   cargarDatosProyecto,
   guardarSnapshot,
   limpiarRecalculoPendiente,
+  listarSnapshots,
   obtenerCatalogoIndicadores,
   obtenerListas,
   obtenerParametros,
   registrarEventoSimple,
 } from '@/data/repo'
+import { moneda } from '@/lib/formato'
 import type {
   Alerta,
   DatosProyecto,
@@ -37,6 +40,7 @@ import type {
   ListaControlada,
   Parametros,
   ResultadoIndicador,
+  Snapshot,
 } from '@/domain/types'
 
 interface EstadoProyecto {
@@ -48,6 +52,13 @@ interface EstadoProyecto {
   alertas: Alerta[]
   parametros: Parametros | null
   listas: ListaControlada[]
+  /** Instantaneas por fecha de corte: la serie historica real del proyecto. */
+  instantaneas: Snapshot[]
+  /**
+   * Valor ganado y costos. Se calcula una sola vez aqui para que el dashboard,
+   * el tablero y el modulo de costos no puedan mostrar cifras distintas.
+   */
+  analisis: AnalisisCostos | null
   cargando: boolean
   error: string | null
   recargar: () => Promise<void>
@@ -62,6 +73,7 @@ export function ProyectoProvider({ children }: { children: ReactNode }) {
   const [parametros, setParametros] = useState<Parametros | null>(null)
   const [listas, setListas] = useState<ListaControlada[]>([])
   const [catalogoIndicadores, setCatalogo] = useState<DefinicionIndicador[]>([])
+  const [instantaneas, setInstantaneas] = useState<Snapshot[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -70,11 +82,12 @@ export function ProyectoProvider({ children }: { children: ReactNode }) {
     setCargando(true)
     setError(null)
     try {
-      const [d, p, l, c] = await Promise.all([
+      const [d, p, l, c, s] = await Promise.all([
         cargarDatosProyecto(proyectoId),
         obtenerParametros(),
         obtenerListas(),
         obtenerCatalogoIndicadores(),
+        listarSnapshots(proyectoId),
       ])
       if (!d) {
         setError('El proyecto no existe o fue eliminado.')
@@ -85,6 +98,7 @@ export function ProyectoProvider({ children }: { children: ReactNode }) {
       setParametros(p)
       setListas(l)
       setCatalogo(c)
+      setInstantaneas(s)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -112,6 +126,16 @@ export function ProyectoProvider({ children }: { children: ReactNode }) {
   const alertas = useMemo(
     () => (datos && resumen ? construirAlertas(datos, resumen) : []),
     [datos, resumen],
+  )
+
+  const analisis = useMemo(
+    () =>
+      datos && resumen
+        ? analizarCostos(datos, resumen, instantaneas, {
+            moneda: (n) => moneda(n, datos.proyecto.moneda),
+          })
+        : null,
+    [datos, resumen, instantaneas],
   )
 
   const recalcular = useCallback(async () => {
@@ -157,6 +181,8 @@ export function ProyectoProvider({ children }: { children: ReactNode }) {
       alertas,
       parametros,
       listas,
+      instantaneas,
+      analisis,
       cargando,
       error,
       recargar,
@@ -171,6 +197,8 @@ export function ProyectoProvider({ children }: { children: ReactNode }) {
       alertas,
       parametros,
       listas,
+      instantaneas,
+      analisis,
       cargando,
       error,
       recargar,

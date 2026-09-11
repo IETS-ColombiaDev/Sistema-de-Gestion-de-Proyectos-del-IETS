@@ -32,75 +32,99 @@ const COLOR_ACCION: Record<string, { fg: string; bg: string }> = {
   acceso: { fg: '#64748B', bg: '#F1F5F9' },
 }
 
+/**
+ * Columnas del registro de auditoria.
+ *
+ * Seis columnas, no nueve: el evento se lee como una frase —quien, cuando, que
+ * hizo, sobre que, en que campo, de que valor a que valor— y para eso el cambio
+ * va junto, no partido en dos columnas que compiten por el ancho. La
+ * justificacion acompana a la entidad, que es su contexto natural.
+ */
 export const COLUMNAS_AUDITORIA: Columna<EventoAuditoria>[] = [
   {
     clave: 'fechaHora',
     titulo: 'Fecha y hora',
     ordenable: true,
-    ancho: '150px',
+    ancho: '132px',
     render: (e) => <span className="hg-t-sm hg-t-num">{fechaHora(e.fechaHora)}</span>,
   },
   {
     clave: 'usuarioNombre',
     titulo: 'Usuario',
     ordenable: true,
+    ancho: '150px',
     render: (e) => <span className="hg-t-sm">{e.usuarioNombre}</span>,
   },
   {
     clave: 'accion',
     titulo: 'Accion',
     ordenable: true,
+    ancho: '116px',
     render: (e) => {
       const c = COLOR_ACCION[e.accion] ?? { fg: '#64748B', bg: '#F1F5F9' }
       return (
-        <Badge fg={c.fg} bg={c.bg} punto>
+        <Badge fg={c.fg} bg={c.bg} punto titulo={`Tipo de cambio: ${e.tipoCambio}`}>
           {e.accion}
         </Badge>
       )
     },
   },
-  { clave: 'tipoCambio', titulo: 'Tipo', ordenable: true, render: (e) => e.tipoCambio },
   {
     clave: 'entidadEtiqueta',
     titulo: 'Entidad afectada',
     ordenable: true,
     render: (e) => (
-      <div style={{ minWidth: 200 }}>
-        <span className="hg-t-sm">{truncar(e.entidadEtiqueta, 60)}</span>
-        <div className="hg-t-xs hg-t-ter">{e.entidad}</div>
+      <div>
+        <span className="hg-t-sm">{truncar(e.entidadEtiqueta, 70)}</span>
+        <div className="hg-t-xs hg-t-ter">
+          {e.entidad} · {e.tipoCambio}
+        </div>
+        {e.comentario && (
+          <div className="hg-t-xs" style={{ color: '#92400E', marginTop: 2 }} title={e.comentario}>
+            Justificacion: {truncar(e.comentario, 110)}
+          </div>
+        )}
       </div>
     ),
   },
-  { clave: 'campo', titulo: 'Campo', ordenable: true, render: (e) => etiquetaCampo(e.campo) },
   {
-    clave: 'valorAnterior',
-    titulo: 'Valor anterior',
-    render: (e) => (
-      <span className="hg-t-xs hg-t-sec" title={e.valorAnterior ?? ''}>
-        {e.valorAnterior == null ? '—' : truncar(e.valorAnterior, 44)}
-      </span>
-    ),
+    clave: 'campo',
+    titulo: 'Campo',
+    ordenable: true,
+    ancho: '140px',
+    render: (e) => <span className="hg-t-sm">{etiquetaCampo(e.campo)}</span>,
   },
   {
-    clave: 'valorNuevo',
-    titulo: 'Valor nuevo',
-    render: (e) => (
-      <span className="hg-t-xs hg-t-bold" title={e.valorNuevo ?? ''}>
-        {e.valorNuevo == null ? '—' : truncar(e.valorNuevo, 44)}
-      </span>
-    ),
-  },
-  {
-    clave: 'comentario',
-    titulo: 'Justificacion',
-    render: (e) =>
-      e.comentario ? (
-        <span className="hg-t-xs" style={{ color: '#92400E' }} title={e.comentario}>
-          {truncar(e.comentario, 50)}
+    clave: 'cambio',
+    titulo: 'Cambio',
+    etiquetaMovil: 'Cambio',
+    render: (e) => {
+      if (e.valorAnterior == null && e.valorNuevo == null) {
+        return <span className="hg-t-ter">—</span>
+      }
+      // Un alta no tiene valor anterior: se muestra el resumen sin la flecha.
+      if (e.valorAnterior == null) {
+        return (
+          <span className="hg-t-xs" title={e.valorNuevo ?? ''}>
+            {truncar(e.valorNuevo ?? '', 90)}
+          </span>
+        )
+      }
+      return (
+        <span className="hg-t-xs" style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline', flexWrap: 'wrap' }}>
+          <span className="hg-t-sec" style={{ textDecoration: 'line-through' }} title={e.valorAnterior}>
+            {truncar(e.valorAnterior, 40)}
+          </span>
+          <span aria-hidden="true" className="hg-t-ter">
+            →
+          </span>
+          <strong title={e.valorNuevo ?? ''}>{truncar(e.valorNuevo ?? '(vacio)', 40)}</strong>
+          <span className="sr-only">
+            cambio de {e.valorAnterior} a {e.valorNuevo}
+          </span>
         </span>
-      ) : (
-        <span className="hg-t-ter">—</span>
-      ),
+      )
+    },
   },
 ]
 
@@ -286,7 +310,12 @@ export default function AuditoriaProyecto() {
           />
         ) : (
           <>
-            <Table columnas={COLUMNAS_AUDITORIA} filas={pagina1} claveDe={(e) => e.id} />
+            <Table
+              columnas={COLUMNAS_AUDITORIA}
+              filas={pagina1}
+              claveDe={(e) => e.id}
+              anchoMinimo="1020px"
+            />
             {totalPaginas > 1 && (
               <div className="hg-fila" style={{ justifyContent: 'center', marginTop: 'var(--sp-md)' }}>
                 <Button variante="secondary" tamano="sm" disabled={pagina === 1} onClick={() => setPagina((p) => p - 1)}>

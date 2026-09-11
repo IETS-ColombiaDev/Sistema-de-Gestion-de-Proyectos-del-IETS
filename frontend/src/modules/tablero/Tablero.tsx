@@ -113,12 +113,14 @@ export default function Tablero() {
           valor={porcentaje(resumen.avancePonderado)}
           pie="Ponderado por duracion de cada actividad"
           acento="#6366F1"
+          pista="Suma de (duracion x avance) de cada actividad, dividida por la suma de duraciones. Una actividad larga pesa mas que una corta. Las actividades sin nombre o sin fechas quedan fuera del calculo."
         />
         <KPICard
           etiqueta="Avance esperado"
           valor={porcentaje(resumen.avanceEsperado)}
           pie="Lo que la programacion preveia a la fecha de corte"
           acento="#0891B2"
+          pista="Las actividades ya vencidas aportan el 100 % de su duracion; las que estan en curso aportan la fraccion de duracion transcurrida. Ambos terminos en dias habiles, en la misma unidad."
         />
         <KPICard
           etiqueta="Desviacion"
@@ -126,12 +128,14 @@ export default function Tablero() {
           color={colorDesviacion}
           pie={`Umbrales: ${resumen.ctx.parametros.umbralPrecaucion} pp precaucion · ${resumen.ctx.parametros.umbralAtencion} pp atencion`}
           acento={colorDesviacion}
+          pista="Avance ponderado menos avance esperado, en puntos porcentuales. Los dos umbrales que definen precaucion y atencion se administran en el catalogo de parametros."
         />
         <KPICard
           etiqueta="Avance simple"
           valor={porcentaje(resumen.avanceSimple)}
           pie="Promedio sin ponderar, solo de referencia"
           acento="#94A3B8"
+          pista="Promedio aritmetico del porcentaje de avance de las actividades vigentes. No pondera por duracion, asi que no debe usarse para reportar el avance del proyecto."
         />
       </div>
 
