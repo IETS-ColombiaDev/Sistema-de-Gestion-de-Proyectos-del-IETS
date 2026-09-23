@@ -513,7 +513,7 @@ Estado: ${h.estado}`}
 
         {/* Leyenda: la identidad nunca depende solo del color */}
         <div className="hg-fila" style={{ marginTop: 'var(--sp-md)', gap: 'var(--sp-md)' }}>
-          {(['Pendiente', 'En curso', 'Completada', 'Retrasada'] as const).map((e) => (
+          {(['Pendiente', 'En curso', 'Completa', 'Retrasada'] as const).map((e) => (
             <span key={e} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-xs)' }}>
               <span
                 aria-hidden="true"

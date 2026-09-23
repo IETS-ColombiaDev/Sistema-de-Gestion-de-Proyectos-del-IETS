@@ -6,6 +6,7 @@
 
 import { festivosRango } from './fechas'
 import {
+  type TipoEntrega,
   CATEGORIAS_INDICADOR,
   CATEGORIAS_RIESGO,
   DISPONIBILIDAD_RECURSO,
@@ -90,7 +91,7 @@ export const LISTAS_POR_DEFECTO: ListaControlada[] = [
   lista('rolRaci', 'Rol RACI', 'Letras admitidas en la matriz de responsabilidades.', ROLES_RACI, false),
   lista(
     'estadoVinculacion',
-    'Estado de vinculacion',
+    'Tipo de vinculacion',
     'Situacion contractual de cada miembro del equipo.',
     ESTADOS_VINCULACION,
     false,
@@ -177,3 +178,90 @@ export function valoresActivos(listas: ListaControlada[], id: string): string[] 
   if (!l) return []
   return l.valores.filter((v) => v.activo).sort((a, b) => a.orden - b.orden).map((v) => v.valor)
 }
+
+/**
+ * Listas de chequeo por defecto para evaluar entregas.
+ *
+ * Son el punto de partida, no una regla fija: viven en el catalogo y el
+ * administrador las edita sin desplegar (ADR-07). Los items marcados como
+ * obligatorios son los que, incumplidos, devuelven la entrega sin importar el
+ * puntaje: son condiciones, no puntos.
+ */
+export const LISTAS_CHEQUEO_POR_DEFECTO: {
+  tipo: TipoEntrega
+  nombre: string
+  items: { texto: string; obligatorio: boolean; ayuda?: string }[]
+}[] = [
+  {
+    tipo: 'Entregable',
+    nombre: 'Entregable general',
+    items: [
+      { texto: 'Corresponde al alcance acordado en la actividad', obligatorio: true },
+      { texto: 'El enlace abre y el contenido es el que anuncia', obligatorio: true },
+      { texto: 'Incluye fecha, version y autor', obligatorio: false },
+      { texto: 'Cita las fuentes utilizadas', obligatorio: false },
+      { texto: 'Sin errores de forma que impidan su uso', obligatorio: false },
+      { texto: 'Listo para ser usado por el destinatario sin retrabajo', obligatorio: false },
+    ],
+  },
+  {
+    tipo: 'Informe',
+    nombre: 'Informe tecnico',
+    items: [
+      { texto: 'Responde la pregunta que motivo el informe', obligatorio: true },
+      { texto: 'El enlace abre y el contenido es el que anuncia', obligatorio: true },
+      { texto: 'Metodologia descrita y reproducible', obligatorio: true },
+      { texto: 'Resultados separados de la interpretacion', obligatorio: false },
+      { texto: 'Conclusiones sostenidas por los resultados mostrados', obligatorio: false },
+      { texto: 'Limitaciones declaradas', obligatorio: false, ayuda: 'Un informe sin limitaciones declaradas suele ser un informe que no las busco.' },
+      { texto: 'Referencias completas y verificables', obligatorio: false },
+      { texto: 'Resumen ejecutivo comprensible sin leer el cuerpo', obligatorio: false },
+    ],
+  },
+  {
+    tipo: 'Encuesta',
+    nombre: 'Instrumento de encuesta',
+    items: [
+      { texto: 'Cada pregunta se relaciona con un objetivo declarado', obligatorio: true },
+      { texto: 'El enlace abre y el contenido es el que anuncia', obligatorio: true },
+      { texto: 'Sin preguntas que induzcan la respuesta', obligatorio: true },
+      { texto: 'Sin preguntas dobles en un mismo enunciado', obligatorio: false },
+      { texto: 'Escalas de respuesta consistentes en todo el instrumento', obligatorio: false },
+      { texto: 'Consentimiento informado y manejo de datos declarados', obligatorio: true, ayuda: 'Requisito de tratamiento de datos personales.' },
+      { texto: 'Tiempo estimado de diligenciamiento informado', obligatorio: false },
+      { texto: 'Probada con al menos un caso antes de enviar', obligatorio: false },
+    ],
+  },
+  {
+    tipo: 'Base de datos',
+    nombre: 'Base de datos o conjunto de datos',
+    items: [
+      { texto: 'Diccionario de variables incluido', obligatorio: true },
+      { texto: 'El enlace abre y el contenido es el que anuncia', obligatorio: true },
+      { texto: 'Sin datos personales identificables', obligatorio: true, ayuda: 'Si los hubo, debe estar anonimizada y declararlo.' },
+      { texto: 'Valores faltantes codificados de forma explicita', obligatorio: false },
+      { texto: 'Una observacion por fila y una variable por columna', obligatorio: false },
+      { texto: 'Fuente y fecha de corte de los datos declaradas', obligatorio: false },
+    ],
+  },
+  {
+    tipo: 'Presentacion',
+    nombre: 'Presentacion',
+    items: [
+      { texto: 'El mensaje principal se entiende sin narracion', obligatorio: true },
+      { texto: 'El enlace abre y el contenido es el que anuncia', obligatorio: true },
+      { texto: 'Las cifras mostradas coinciden con la fuente', obligatorio: true },
+      { texto: 'Los graficos son legibles en proyeccion', obligatorio: false },
+      { texto: 'Duracion acorde al espacio asignado', obligatorio: false },
+    ],
+  },
+  {
+    tipo: 'Otro',
+    nombre: 'Revision minima',
+    items: [
+      { texto: 'Corresponde al alcance acordado', obligatorio: true },
+      { texto: 'El enlace abre y el contenido es el que anuncia', obligatorio: true },
+      { texto: 'Completo y utilizable por el destinatario', obligatorio: false },
+    ],
+  },
+]

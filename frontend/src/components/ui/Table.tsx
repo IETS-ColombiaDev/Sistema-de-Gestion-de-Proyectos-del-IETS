@@ -4,6 +4,7 @@
  * Es la unica variante de tabla de la aplicacion.
  */
 
+import { Pista } from '@/components/Ayuda'
 import type { ReactNode } from 'react'
 import { IconFlechaAbajo, IconFlechaArriba } from '../icons'
 
@@ -22,6 +23,15 @@ export interface Columna<T> {
   /** Valor usado al ordenar; por defecto se intenta con fila[clave]. */
   valorOrden?: (fila: T) => string | number
   oculta?: boolean
+  /**
+   * Explicacion de la columna, accesible con teclado y al pasar el cursor.
+   *
+   * Un encabezado tiene dos o tres palabras y muchas veces eso no alcanza para
+   * saber que mide la cifra ni de donde sale. Ponerlo en el encabezado y no en
+   * una leyenda al pie evita que el lector tenga que buscar la explicacion
+   * lejos del dato.
+   */
+  pista?: string
 }
 
 interface Props<T> {
@@ -95,6 +105,7 @@ export default function Table<T>({
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   {c.titulo}
+                  {c.pista && <Pista texto={c.pista} />}
                   {orden?.clave === c.clave &&
                     (orden.dir === 'asc' ? (
                       <IconFlechaArriba size={12} />

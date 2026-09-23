@@ -164,7 +164,7 @@ export const ETIQUETAS_CAMPO: Record<string, string> = {
   probabilidad: 'Probabilidad',
   impacto: 'Impacto',
   disponibilidad: 'Disponibilidad',
-  estadoVinculacion: 'Estado de vinculacion',
+  estadoVinculacion: 'Tipo de vinculacion',
   conforme: 'Conforme',
   evaluado: 'Evaluado',
   programado: 'Programado',

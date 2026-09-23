@@ -364,3 +364,159 @@ export const archivarAuditoria = onSchedule(
     logger.info('Auditoria archivada', { eventos: antiguos.size, corte })
   },
 )
+
+// ---------------------------------------------------------------------------
+// 7. Sugerencias asistidas por IA
+// ---------------------------------------------------------------------------
+
+/**
+ * Proxy del proveedor de IA.
+ *
+ * Vive en el servidor por una razon concreta: la clave del proveedor no puede
+ * viajar al navegador. Cualquier llamada hecha desde el cliente expondria la
+ * credencial a quien abra las herramientas de desarrollo, y una clave expuesta
+ * es una clave comprometida —da igual que este ofuscada o en una variable de
+ * entorno del build, porque el bundle es publico—. Aqui la clave se lee del
+ * gestor de secretos de la plataforma y nunca sale de la funcion.
+ *
+ * Lo que devuelve son SUGERENCIAS. No escribe nada: quien decide es la persona
+ * que revisa. Un riesgo o un hito que entra al proyecto sin que nadie lo haya
+ * aceptado seria un dato sin responsable, y el sistema exige que todo dato
+ * tenga uno.
+ */
+
+const MINIMAX_URL =
+  process.env.MINIMAX_API_URL ?? 'https://api.minimax.chat/v1/text/chatcompletion_v2'
+const MINIMAX_MODELO = process.env.MINIMAX_MODEL ?? 'MiniMax-Text-01'
+
+/** Cuantas sugerencias como maximo. Mas de seis nadie las lee. */
+const TOPE_SUGERENCIAS = 6
+
+interface Sugerencia {
+  titulo: string
+  detalle: string
+  /** Campos propios del tipo pedido; el cliente los mapea al formulario. */
+  extra?: Record<string, string>
+}
+
+const INSTRUCCIONES: Record<string, string> = {
+  riesgos: [
+    'Eres un especialista en gestion de proyectos de evaluacion de tecnologias sanitarias.',
+    'Propon riesgos que ESTE proyecto podria enfrentar, a partir de los datos que se te dan.',
+    'Cada riesgo debe ser especifico y accionable, no una generalidad aplicable a cualquier proyecto.',
+    'Para cada uno indica: titulo (max 90 caracteres), detalle (una frase con la causa y el efecto),',
+    'categoria (Tecnico, Cronograma, Costo, Alcance, Recursos, Externo o Calidad),',
+    'probabilidad (1 a 5), impacto (1 a 5) y mitigacion (una accion concreta).',
+    'No repitas riesgos que ya existan en la lista que se te entrega.',
+  ].join(' '),
+  hitos: [
+    'Eres un especialista en gestion de proyectos de evaluacion de tecnologias sanitarias.',
+    'Propon hitos de control para ESTE proyecto, a partir de su cronograma y sus fases.',
+    'Un hito es un punto verificable de decision o entrega, no una tarea.',
+    'Para cada uno indica: titulo (max 90 caracteres), detalle (que debe estar demostrado para darlo por cumplido)',
+    'y fechaSugerida en formato AAAA-MM-DD, coherente con las fechas del proyecto.',
+    'No repitas hitos que ya existan en la lista que se te entrega.',
+  ].join(' '),
+  portafolio: [
+    'Eres un asesor de direccion de un instituto de evaluacion de tecnologias sanitarias.',
+    'Se te dan indicadores consolidados de una cartera de proyectos.',
+    'Senala de forma concisa y precisa los puntos que requieren decision de la direccion.',
+    'Cada punto debe nombrar el proyecto o la cifra concreta que lo motiva, y proponer una accion.',
+    'No repitas lo que la cifra ya dice por si sola: aporta la lectura, no el dato.',
+    'Para cada uno indica: titulo (max 90 caracteres) y detalle (dos frases como maximo).',
+  ].join(' '),
+}
+
+export const sugerirConIA = onCall(
+  { region: REGION, secrets: ['MINIMAX_API_KEY'], timeoutSeconds: 60 },
+  async (peticion): Promise<{ sugerencias: Sugerencia[]; modelo: string }> => {
+    if (!peticion.auth) {
+      throw new HttpsError('unauthenticated', 'Se requiere sesion.')
+    }
+
+    const clave = process.env.MINIMAX_API_KEY
+    if (!clave) {
+      // Se distingue de un fallo: el sistema funciona sin IA, y decirlo es
+      // mejor que devolver una lista vacia que parece "sin hallazgos".
+      throw new HttpsError(
+        'failed-precondition',
+        'El asistente de IA no esta configurado en este entorno.',
+      )
+    }
+
+    const tipo = String(peticion.data?.tipo ?? '')
+    const instruccion = INSTRUCCIONES[tipo]
+    if (!instruccion) {
+      throw new HttpsError('invalid-argument', `Tipo de sugerencia no reconocido: ${tipo}`)
+    }
+
+    // El contexto lo arma el cliente y se recorta aqui: un prompt sin tope
+    // puede crecer sin control y encarecer cada llamada.
+    const contexto = String(peticion.data?.contexto ?? '').slice(0, 6000)
+
+    let respuesta: Response
+    try {
+      respuesta = await fetch(MINIMAX_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clave}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: MINIMAX_MODELO,
+          messages: [
+            {
+              role: 'system',
+              content: `${instruccion} Responde UNICAMENTE con un objeto JSON de la forma {"sugerencias":[{"titulo":"...","detalle":"...","extra":{}}]}, con un maximo de ${TOPE_SUGERENCIAS} elementos, en espanol y sin tildes.`,
+            },
+            { role: 'user', content: contexto },
+          ],
+          temperature: 0.3,
+          max_tokens: 1400,
+        }),
+      })
+    } catch (error) {
+      logger.error('Fallo la llamada al proveedor de IA', error)
+      throw new HttpsError('unavailable', 'No fue posible contactar al asistente de IA.')
+    }
+
+    if (!respuesta.ok) {
+      // El cuerpo del error puede traer detalles del proveedor; se registra en
+      // el log del servidor y NO se devuelve al cliente, porque suele incluir
+      // eco de la peticion.
+      logger.error('El proveedor de IA respondio con error', {
+        estado: respuesta.status,
+      })
+      throw new HttpsError('unavailable', 'El asistente de IA no respondio correctamente.')
+    }
+
+    const cuerpo = (await respuesta.json()) as {
+      choices?: { message?: { content?: string } }[]
+    }
+    const texto = cuerpo.choices?.[0]?.message?.content ?? ''
+
+    let sugerencias: Sugerencia[] = []
+    try {
+      // El modelo a veces envuelve el JSON en un bloque de codigo; se extrae el
+      // objeto en vez de fallar por un par de acentos graves.
+      const crudo = texto.replace(/^[^{]*/, '').replace(/[^}]*$/, '')
+      const objeto = JSON.parse(crudo) as { sugerencias?: Sugerencia[] }
+      sugerencias = Array.isArray(objeto.sugerencias) ? objeto.sugerencias : []
+    } catch {
+      logger.warn('La respuesta del modelo no era JSON interpretable')
+      throw new HttpsError('internal', 'El asistente devolvio una respuesta que no se pudo leer.')
+    }
+
+    return {
+      sugerencias: sugerencias
+        .filter((s) => s && typeof s.titulo === 'string' && s.titulo.trim().length > 0)
+        .slice(0, TOPE_SUGERENCIAS)
+        .map((s) => ({
+          titulo: String(s.titulo).slice(0, 120),
+          detalle: String(s.detalle ?? '').slice(0, 600),
+          extra: s.extra && typeof s.extra === 'object' ? s.extra : undefined,
+        })),
+      modelo: MINIMAX_MODELO,
+    }
+  },
+)

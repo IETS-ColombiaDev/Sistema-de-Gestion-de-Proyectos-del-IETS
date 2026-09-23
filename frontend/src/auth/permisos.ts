@@ -32,6 +32,9 @@ export const ACCIONES = [
   'satisfaccion.editar',
   'presupuesto.editar',
   'evidencias.subir',
+  // Entregas y calidad
+  'entregas.registrar',
+  'entregas.evaluar',
   // Sistema
   'catalogos.editar',
   'usuarios.administrar',
@@ -67,6 +70,8 @@ export const MATRIZ_PERMISOS: Matriz = {
     'satisfaccion.editar',
     'presupuesto.editar',
     'evidencias.subir',
+    'entregas.registrar',
+    'entregas.evaluar',
     'indicadores.recalcular',
     'datos.importar',
     'datos.exportar',
@@ -87,14 +92,20 @@ export const MATRIZ_PERMISOS: Matriz = {
     'productos.editar',
     'satisfaccion.editar',
     'evidencias.subir',
+    'entregas.registrar',
     'indicadores.recalcular',
     'datos.exportar',
   ],
 
+  // El miembro entrega su propio trabajo; no se evalua a si mismo. La
+  // separacion entre quien produce y quien da por bueno es el sentido de la
+  // evaluacion: si el autor pudiera aprobarla, la lista de chequeo seria un
+  // formalismo.
   miembro: [
     'proyecto.ver',
     'cronograma.editarAvancePropio',
     'evidencias.subir',
+    'entregas.registrar',
   ],
 
   directivo: ['proyecto.ver', 'portafolio.ver', 'datos.exportar'],

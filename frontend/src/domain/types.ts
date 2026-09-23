@@ -39,7 +39,7 @@ export interface Usuario {
 // Listas controladas (seccion 4.2)
 // ---------------------------------------------------------------------------
 
-export const ESTADOS_ACTIVIDAD = ['Pendiente', 'En curso', 'Completada', 'Retrasada'] as const
+export const ESTADOS_ACTIVIDAD = ['Pendiente', 'En curso', 'Completa', 'Retrasada'] as const
 export type EstadoActividad = (typeof ESTADOS_ACTIVIDAD)[number] | ''
 
 export const ESTADOS_HITO = [
@@ -71,13 +71,19 @@ export type EstadoIndicador = (typeof ESTADOS_INDICADOR)[number]
 export const ROLES_RACI = ['R', 'A', 'C', 'I'] as const
 export type LetraRaci = (typeof ROLES_RACI)[number]
 
-export const ESTADOS_VINCULACION = [
-  'Por definir',
-  'Contactado',
-  'Confirmado',
-  'Contratado',
-  'No disponible',
-] as const
+/**
+ * Tipo de vinculacion de la persona con la entidad.
+ *
+ * Antes esta lista describia la ETAPA de contratacion (contactado, confirmado,
+ * contratado). Eso respondia "en que punto va el tramite", que es una pregunta
+ * de gestion humana y no de gestion del proyecto. Lo que el proyecto necesita
+ * saber es de que tipo es el vinculo, porque determina disponibilidad, costo y
+ * a quien se le puede asignar responsabilidad formal.
+ *
+ * "Por definir" no es un tipo de vinculo sino su ausencia: acompana a los
+ * perfiles todavia sin persona designada (`porDesignar`).
+ */
+export const ESTADOS_VINCULACION = ['Planta', 'Contratista', 'Por definir'] as const
 export type EstadoVinculacion = (typeof ESTADOS_VINCULACION)[number]
 
 export const TIPOS_RECURSO = ['Humano', 'Tecnologico', 'Informacion', 'Logistico'] as const
@@ -101,6 +107,7 @@ export const TIPOS_CAMBIO = [
   'Hito',
   'Riesgo',
   'Recurso',
+  'Entrega',
   'Decision',
   'Otro',
 ] as const
@@ -472,6 +479,108 @@ export interface Snapshot {
   riesgosPorNivel: Record<string, number>
 }
 
+
+// ---------------------------------------------------------------------------
+// Entregas y evaluacion de calidad
+// ---------------------------------------------------------------------------
+
+/**
+ * Que clase de producto se esta entregando.
+ *
+ * Determina la lista de chequeo con la que se evalua: a una encuesta se le
+ * revisan cosas distintas que a un informe, y usar una sola lista para todo
+ * obliga a marcar "no aplica" en la mitad de los items, que es como no
+ * evaluar.
+ */
+export const TIPOS_ENTREGA = [
+  'Entregable',
+  'Informe',
+  'Encuesta',
+  'Base de datos',
+  'Presentacion',
+  'Otro',
+] as const
+export type TipoEntrega = (typeof TIPOS_ENTREGA)[number]
+
+export const ESTADOS_ENTREGA = [
+  'Entregada',
+  'En evaluacion',
+  'Aprobada',
+  'Aprobada con observaciones',
+  'Devuelta',
+] as const
+export type EstadoEntrega = (typeof ESTADOS_ENTREGA)[number]
+
+export interface ItemChequeo {
+  id: string
+  texto: string
+  /** Un item obligatorio incumplido impide aprobar sin observaciones. */
+  obligatorio: boolean
+  ayuda?: string
+}
+
+/** Lista de chequeo por tipo de entrega. Vive en catalogos (ADR-07). */
+export interface ListaChequeo extends EntidadBase {
+  tipo: TipoEntrega
+  nombre: string
+  items: ItemChequeo[]
+  activa: boolean
+}
+
+export interface ResultadoItem {
+  itemId: string
+  /** null = todavia sin revisar. No es lo mismo que incumplir. */
+  cumple: boolean | null
+  observacion?: string
+}
+
+export interface EvaluacionEntrega {
+  evaluadaPor: string
+  evaluadaPorNombre: string
+  evaluadaEn: ISODateTime
+  listaId: string
+  resultados: ResultadoItem[]
+  /**
+   * 0..100. CALCULADO a partir de la lista (ADR-03): no existe ruta para
+   * escribirlo a mano, ni en la interfaz ni en las reglas de seguridad. Una
+   * calificacion que se puede teclear deja de medir la lista de chequeo.
+   */
+  puntaje: number
+  veredicto: Extract<EstadoEntrega, 'Aprobada' | 'Aprobada con observaciones' | 'Devuelta'>
+  comentario: string
+}
+
+/**
+ * Una entrega del miembro del equipo, con su evaluacion.
+ *
+ * El archivo NO se copia al sistema: se guarda el enlace al repositorio
+ * institucional (OneDrive / SharePoint). Copiarlo crearia una segunda version
+ * de la verdad y un problema de custodia —cual de las dos es la buena— que el
+ * sistema no puede resolver.
+ *
+ * Una entrega devuelta no se edita: se entrega una version nueva. El historial
+ * de versiones es lo que permite ver si el entregable mejoro tras la
+ * observacion, y reescribir la anterior borraria justamente esa evidencia.
+ */
+export interface Entrega extends EntidadBase {
+  proyectoId: string
+  actividadId: string | null
+  productoId: string | null
+  tipo: TipoEntrega
+  titulo: string
+  /** Enlace al repositorio institucional. */
+  enlace: string
+  entregadoPor: string
+  entregadoPorNombre: string
+  fechaEntrega: ISODate
+  version: number
+  /** Id de la entrega que esta reemplaza, si es una nueva version. */
+  reemplazaA: string | null
+  estado: EstadoEntrega
+  notaDelAutor?: string
+  evaluacion: EvaluacionEntrega | null
+}
+
 // ---------------------------------------------------------------------------
 // Auditoria — EP-20 (append-only, ADR-06)
 // ---------------------------------------------------------------------------
@@ -560,4 +669,5 @@ export interface DatosProyecto {
   productos: Producto[]
   satisfaccion: MedicionSatisfaccion[]
   presupuesto: RegistroPresupuestal[]
+  entregas: Entrega[]
 }

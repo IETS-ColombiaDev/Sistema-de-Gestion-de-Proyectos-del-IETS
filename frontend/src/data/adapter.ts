@@ -51,9 +51,11 @@ export const rutas = {
   productos: (p: string) => `proyectos/${p}/productos`,
   satisfaccion: (p: string) => `proyectos/${p}/satisfaccion`,
   presupuesto: (p: string) => `proyectos/${p}/presupuesto`,
+  entregas: (p: string) => `proyectos/${p}/entregas`,
   snapshots: (p: string) => `proyectos/${p}/snapshots`,
   auditoria: () => 'auditoria',
   catalogoListas: () => 'catalogos_listas',
   catalogoIndicadores: () => 'catalogos_indicadores',
   catalogoParametros: () => 'catalogos_parametros',
+  catalogoChequeos: () => 'catalogos_chequeos',
 } as const

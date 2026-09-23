@@ -12,8 +12,11 @@ import { nuevoId, rutas, type Adaptador, type DocumentoBase } from './adapter'
 import { obtenerAdaptador } from './backend'
 import { calcularCambios, construirEventos, type ContextoAuditoria } from './auditoria'
 import { CATALOGO_INDICADORES } from '@/domain/indicadores'
-import { LISTAS_POR_DEFECTO, PARAMETROS_POR_DEFECTO } from '@/domain/catalogos'
+import {
+  LISTAS_CHEQUEO_POR_DEFECTO, LISTAS_POR_DEFECTO, PARAMETROS_POR_DEFECTO } from '@/domain/catalogos'
 import type {
+  ListaChequeo,
+  Entrega,
   Actividad,
   AsignacionRaci,
   DatosProyecto,
@@ -361,6 +364,50 @@ export async function guardarLista(lista: ListaControlada, comentario?: string):
   )
 }
 
+// ---------------------------------------------------------------------------
+// Listas de chequeo (catalogo)
+// ---------------------------------------------------------------------------
+
+/**
+ * Listas de chequeo vigentes. Si el catalogo esta vacio, lo siembra con las
+ * listas por defecto: un sistema sin listas no podria evaluar nada, y obligar
+ * a crearlas antes de la primera evaluacion es una barrera sin proposito.
+ */
+export async function obtenerListasChequeo(): Promise<ListaChequeo[]> {
+  const ad = await adaptador()
+  const docs = await ad.listar<ListaChequeo & DocumentoBase>(rutas.catalogoChequeos())
+  const vigentes = docs.filter((d) => !d.eliminado)
+  if (vigentes.length > 0) return vigentes
+
+  const sembrado: ListaChequeo[] = LISTAS_CHEQUEO_POR_DEFECTO.map((l, i) => ({
+    id: `chk${i + 1}`,
+    tipo: l.tipo,
+    nombre: l.nombre,
+    activa: true,
+    items: l.items.map((it, k) => ({
+      id: `chk${i + 1}-i${k + 1}`,
+      texto: it.texto,
+      obligatorio: it.obligatorio,
+      ayuda: it.ayuda,
+    })),
+    creadoEn: ahora(),
+    creadoPor: 'sistema',
+    actualizadoEn: ahora(),
+    actualizadoPor: 'sistema',
+  }))
+  await ad.guardarLote(rutas.catalogoChequeos(), sembrado as unknown as DocumentoBase[])
+  return sembrado
+}
+
+export async function guardarListaChequeo(lista: ListaChequeo): Promise<void> {
+  const ad = await adaptador()
+  await ad.guardar(rutas.catalogoChequeos(), {
+    ...lista,
+    actualizadoEn: ahora(),
+    actualizadoPor: sesion.uid,
+  } as unknown as DocumentoBase)
+}
+
 export async function obtenerCatalogoIndicadores(): Promise<DefinicionIndicador[]> {
   const ad = await adaptador()
   const docs = await ad.listar<DefinicionIndicador & DocumentoBase>(rutas.catalogoIndicadores())
@@ -458,8 +505,18 @@ export async function cargarDatosProyecto(proyectoId: string): Promise<DatosProy
   const proyecto = await obtenerProyecto(proyectoId)
   if (!proyecto || proyecto.eliminado) return null
 
-  const [equipo, actividades, hitos, raci, riesgos, recursos, productos, satisfaccion, presupuesto] =
-    await Promise.all([
+  const [
+    equipo,
+    actividades,
+    hitos,
+    raci,
+    riesgos,
+    recursos,
+    productos,
+    satisfaccion,
+    presupuesto,
+    entregas,
+  ] = await Promise.all([
       listarVigentes<MiembroEquipo>(rutas.equipo(proyectoId)),
       listarVigentes<Actividad>(rutas.actividades(proyectoId)),
       listarVigentes<Hito>(rutas.hitos(proyectoId)),
@@ -469,6 +526,7 @@ export async function cargarDatosProyecto(proyectoId: string): Promise<DatosProy
       listarVigentes<Producto>(rutas.productos(proyectoId)),
       listarVigentes<MedicionSatisfaccion>(rutas.satisfaccion(proyectoId)),
       listarVigentes<RegistroPresupuestal>(rutas.presupuesto(proyectoId)),
+      listarVigentes<Entrega>(rutas.entregas(proyectoId)),
     ])
 
   return {
@@ -482,6 +540,8 @@ export async function cargarDatosProyecto(proyectoId: string): Promise<DatosProy
     productos,
     satisfaccion: satisfaccion.sort((a, b) => a.periodo.localeCompare(b.periodo)),
     presupuesto: presupuesto.sort((a, b) => a.periodo.localeCompare(b.periodo)),
+    // Mas recientes primero: una entrega se consulta para ver la ultima version.
+    entregas: entregas.sort((a, b) => b.fechaEntrega.localeCompare(a.fechaEntrega)),
   }
 }
 

@@ -12,6 +12,7 @@ import LimiteError from '@/components/LimiteError'
 import Button from '@/components/Button'
 import { Cargando, ErrorVista } from '@/components/EstadoVista'
 import { IconCalendario, IconImprimir, IconRefrescar } from '@/components/icons'
+import { resumirEntregas } from '@/domain/entregas'
 import { formatearFecha } from '@/domain/fechas'
 import { useProyecto } from './ProyectoContext'
 import { navProyecto } from './navegacion'
@@ -27,6 +28,7 @@ export default function LayoutProyecto() {
 
   const contadores = useMemo<Record<string, number>>(() => {
     if (!resumen) return {} as Record<string, number>
+    const entregas = resumirEntregas(datos?.entregas ?? [])
     return {
       alertas: alertas.filter((a) => a.severidad === 'critica' || a.severidad === 'alta').length,
       retrasadas: resumen.retrasadas.length,
@@ -34,8 +36,10 @@ export default function LayoutProyecto() {
       recursos: resumen.recursos.porGestionar,
       raci: resumen.raci.filter((r) => !r.conforme).length,
       hitos: resumen.hitos.filter((h) => h.vencido).length,
+      // Lo que espera accion: sin evaluar o devuelto.
+      entregas: entregas.pendientesDeEvaluar + entregas.devueltas,
     }
-  }, [resumen, alertas])
+  }, [resumen, alertas, datos])
 
   const proyecto = datos?.proyecto ?? null
   const rol = rolEnProyecto(usuario, proyecto)

@@ -7,6 +7,7 @@
 import { NavLink } from 'react-router-dom'
 import type { GrupoNav } from '@/app/navegacion'
 import { puedeEnProyecto } from '@/auth/permisos'
+import SelectorProyecto from './SelectorProyecto'
 import { useAuth } from '@/auth/AuthContext'
 import type { Proyecto } from '@/domain/types'
 
@@ -38,6 +39,8 @@ export default function Sidebar({ grupos, abierta, onCerrar, proyecto, contadore
             <div className="hg-sidebar__organismo">Sistema de Gestion de Proyectos</div>
           </div>
         </div>
+
+        {proyecto && <SelectorProyecto actual={proyecto} />}
 
         <nav className="hg-sidebar__nav scroll-discreto">
           {grupos.map((grupo) => {

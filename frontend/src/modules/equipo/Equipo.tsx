@@ -16,6 +16,7 @@ import { Checkbox, Input, Select, Textarea } from '@/components/ui/Field'
 import { Cargando, Vacio } from '@/components/EstadoVista'
 import { useToast } from '@/components/Toast'
 import { IconEditar, IconEliminar, IconEquipo, IconMas } from '@/components/icons'
+import { estadoColors } from '@/styles/theme'
 import { useProyecto } from '@/app/ProyectoContext'
 import { useAuth } from '@/auth/AuthContext'
 import { puedeEnProyecto } from '@/auth/permisos'
@@ -34,13 +35,9 @@ const VACIO: Partial<MiembroEquipo> = {
   estadoVinculacion: 'Por definir',
 }
 
-const COLOR_VINCULACION: Record<string, { fg: string; bg: string }> = {
-  'Por definir': { fg: '#92400E', bg: '#FEF3C7' },
-  Contactado: { fg: '#1D4ED8', bg: '#DBEAFE' },
-  Confirmado: { fg: '#0E7490', bg: '#CFFAFE' },
-  Contratado: { fg: '#047857', bg: '#D1FAE5' },
-  'No disponible': { fg: '#B91C1C', bg: '#FEE2E2' },
-}
+// La paleta de vinculacion vive en el tema, con el resto de las familias de
+// estado, para que no haya dos definiciones del mismo color.
+const COLOR_VINCULACION = estadoColors.vinculacion as Record<string, { fg: string; bg: string }>
 
 export default function Equipo() {
   const { datos, resumen, cargando, recargar } = useProyecto()
@@ -380,7 +377,7 @@ export default function Equipo() {
               onChange={(e) => setEdicion({ ...edicion, mesesVinculacion: Number(e.target.value) })}
             />
             <Select
-              label="Estado de vinculacion"
+              label="Tipo de vinculacion"
               value={edicion.estadoVinculacion ?? 'Por definir'}
               opciones={ESTADOS_VINCULACION}
               ayuda="Cada cambio de estado queda auditado con fecha."

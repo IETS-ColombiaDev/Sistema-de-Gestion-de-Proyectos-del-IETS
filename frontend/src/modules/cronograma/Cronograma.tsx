@@ -488,7 +488,7 @@ export default function Cronograma() {
                     Estado{' '}
                     <Pista
                       etiqueta="Como se determina el estado"
-                      texto="Campo calculado y no editable. Completada si el avance llega a 100 %; Retrasada si la fecha de corte paso la fecha fin sin llegar al 100 %; En curso si el corte esta dentro de la ventana; Pendiente si aun no inicia."
+                      texto="Campo calculado y no editable. Completa si el avance llega a 100 %; Retrasada si la fecha de corte paso la fecha fin sin llegar al 100 %; En curso si el corte esta dentro de la ventana; Pendiente si aun no inicia."
                     />
                   </th>
                   <th className="hg-num" style={{ width: 92 }}>

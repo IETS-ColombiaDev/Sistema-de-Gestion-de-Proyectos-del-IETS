@@ -194,7 +194,7 @@ export function miembro(over: Partial<MiembroEquipo> = {}): MiembroEquipo {
     usuarioUid: null,
     dedicacionHorasMes: 80,
     mesesVinculacion: 6,
-    estadoVinculacion: 'Contratado',
+    estadoVinculacion: 'Contratista',
     ...over,
   }
 }
@@ -208,6 +208,7 @@ export function datos(over: Partial<DatosProyecto> = {}): DatosProyecto {
     raci: [],
     riesgos: [],
     recursos: [],
+    entregas: [],
     productos: [],
     satisfaccion: [],
     presupuesto: [],

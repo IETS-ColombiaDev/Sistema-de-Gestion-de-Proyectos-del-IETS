@@ -27,7 +27,7 @@ export const CATALOGO_INDICADORES: DefinicionIndicador[] = [
     categoria: 'Eficacia',
     objetivo: 'Medir la proporcion de actividades programadas que se completaron a tiempo.',
     formulaDescripcion:
-      'Actividades con fecha fin <= fecha de corte y estado "Completada" / actividades con fecha fin <= fecha de corte',
+      'Actividades con fecha fin <= fecha de corte y estado "Completa" / actividades con fecha fin <= fecha de corte',
     formulaClave: 'cumplimientoCronograma',
     fuente: 'Modulo Cronograma',
     frecuencia: 'Semanal',
@@ -239,7 +239,7 @@ export const FORMULAS: Record<string, Formula> = {
           'Aun no hay actividades cuya fecha fin haya llegado. El indicador se activa con la primera actividad vencida.',
       }
     }
-    const completadas = vencidas.filter((a) => a.estado === 'Completada').length
+    const completadas = vencidas.filter((a) => a.estado === 'Completa').length
     return {
       valor: r2(pct(completadas, vencidas.length)),
       numerador: completadas,

@@ -84,7 +84,7 @@ const redondear = (n: number, dec = 2): number => {
 
 /**
  * Orden de evaluacion heredado del libro, conservado literalmente:
- * "Completada" prevalece sobre "Retrasada".
+ * "Completa" prevalece sobre "Retrasada".
  * Guarda de fila vacia obligatoria (D-14): una actividad sin nombre o sin
  * fechas no produce estado y queda fuera de todos los agregados.
  */
@@ -108,7 +108,7 @@ export function estadoActividad(
   const avance = Number(act.avance) || 0
 
   if (avance >= 100) {
-    return { estado: 'Completada', razon: 'El avance registrado alcanza el 100 %.', vacia: false }
+    return { estado: 'Completa', razon: 'El avance registrado alcanza el 100 %.', vacia: false }
   }
   if (fechaCorte > fin) {
     return {
@@ -351,7 +351,7 @@ export interface DistribucionEstado {
 export function distribucionPorEstado(acts: ActividadCalculada[]): DistribucionEstado[] {
   const vigentes = acts.filter((a) => !a.vacia)
   const total = vigentes.length
-  const estados: EstadoActividad[] = ['Pendiente', 'En curso', 'Completada', 'Retrasada']
+  const estados: EstadoActividad[] = ['Pendiente', 'En curso', 'Completa', 'Retrasada']
   return estados.map((estado) => {
     const conteo = vigentes.filter((a) => a.estado === estado).length
     return { estado, conteo, porcentaje: total === 0 ? 0 : redondear((conteo / total) * 100) }
@@ -396,7 +396,7 @@ export function avancePorFase(
         actividades: propias.length,
         avance: redondear(avance),
         avanceEsperado: redondear(esperado),
-        completadas: propias.filter((a) => a.estado === 'Completada').length,
+        completadas: propias.filter((a) => a.estado === 'Completa').length,
         retrasadas: propias.filter((a) => a.estado === 'Retrasada').length,
       }
     })
@@ -734,7 +734,10 @@ export function resumenRecursos(recursos: Recurso[]): ResumenRecursos {
 export interface ResumenEquipo {
   total: number
   porDefinir: number
-  contratados: number
+  /** Vinculados de planta. */
+  planta: number
+  /** Vinculados por contrato de prestacion de servicios. */
+  contratistas: number
   dedicacionTotalHorasMes: number
   porEstado: Record<string, number>
 }
@@ -746,7 +749,8 @@ export function resumenEquipo(equipo: MiembroEquipo[]): ResumenEquipo {
   return {
     total: vigentes.length,
     porDefinir: porEstado['Por definir'] ?? 0,
-    contratados: porEstado['Contratado'] ?? 0,
+    planta: porEstado['Planta'] ?? 0,
+    contratistas: porEstado['Contratista'] ?? 0,
     dedicacionTotalHorasMes: redondear(
       vigentes.reduce((s, m) => s + (Number(m.dedicacionHorasMes) || 0), 0),
     ),

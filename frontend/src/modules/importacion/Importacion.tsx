@@ -454,7 +454,7 @@ export default function Importacion() {
             Nombre: m.porDesignar ? '(por designar)' : m.nombre,
             'Dedicacion (h/mes)': m.dedicacionHorasMes,
             'Meses de vinculacion': m.mesesVinculacion,
-            'Estado de vinculacion': m.estadoVinculacion,
+            'Tipo de vinculacion': m.estadoVinculacion,
           })),
         },
         {

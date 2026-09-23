@@ -190,3 +190,65 @@ cliente manipulado.
 - **Storage:** versionado del bucket activado; las evidencias no se borran, se reemplazan.
 - **Recuperación:** al restaurar Firestore, ejecutar `recalculoDiario` manualmente para regenerar
   las instantáneas de indicadores.
+
+
+---
+
+## Asistente de IA (sugerencias de riesgos, hitos y portafolio)
+
+El asistente es **opcional**: sin él el sistema funciona igual y los paneles lo
+declaran en pantalla en vez de mostrarse vacíos.
+
+### Por qué la clave va en el servidor y no en el cliente
+
+El navegador es un entorno público. Cualquier credencial incluida en el paquete
+del frontend —incluso a través de una variable `VITE_*`— queda en el JavaScript
+que se descarga, legible por quien abra las herramientas de desarrollo. Una
+clave así se considera comprometida desde el primer despliegue.
+
+Por eso la llamada al proveedor la hace la Cloud Function `sugerirConIA`, que
+lee la credencial del gestor de secretos y nunca la devuelve al cliente.
+
+### Configuración
+
+La clave **no se escribe en ningún archivo del repositorio**, ni en `.env`, ni
+en esta documentación. Se registra directamente en el gestor de secretos:
+
+```bash
+# Pide el valor por consola; no queda en el historial del shell
+firebase functions:secrets:set MINIMAX_API_KEY
+
+# Opcionales, solo si se cambia de modelo o de endpoint
+firebase functions:config:set minimax.model="MiniMax-Text-01"
+```
+
+| Secreto / variable | Dónde vive | Notas |
+|---|---|---|
+| `MINIMAX_API_KEY` | Gestor de secretos de Firebase | **Nunca** en el repositorio ni en el cliente |
+| `MINIMAX_API_URL` | Variable de entorno de la función | Opcional; por defecto el endpoint de MiniMax |
+| `MINIMAX_MODEL` | Variable de entorno de la función | Opcional |
+
+Después de registrar el secreto:
+
+```bash
+firebase deploy --only functions:sugerirConIA
+```
+
+Para rotar la clave se repite `functions:secrets:set` y se vuelve a desplegar la
+función; no hay que tocar el frontend.
+
+### Qué se envía al proveedor
+
+Datos **estructurales** del proyecto: nombre, objeto, alcance, fechas, fases,
+estados de actividad e indicadores agregados. **No** se envía el contenido de
+los entregables, ni los enlaces del repositorio institucional, ni datos de
+personas más allá del rol. El contexto se recorta a 6 000 caracteres en la
+función, de modo que un proyecto grande no dispare el costo por llamada.
+
+### Qué hace y qué no hace el asistente
+
+Devuelve **sugerencias**. No escribe nada en el proyecto: cada propuesta se
+revisa y se acepta una por una, y lo que entra queda registrado en la auditoría
+a nombre de quien lo aceptó. Un riesgo o un hito que entrara solo sería un dato
+sin responsable, y en un sistema donde toda escritura se audita eso es una
+contradicción.

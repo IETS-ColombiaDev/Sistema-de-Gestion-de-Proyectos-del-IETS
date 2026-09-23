@@ -21,6 +21,9 @@ import { Cargando, Vacio } from '@/components/EstadoVista'
 import { useToast } from '@/components/Toast'
 import { IconEditar, IconEliminar, IconHito, IconMas } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
+import PanelIA from '@/components/PanelIA'
+import SelectorActividades from '@/components/SelectorActividades'
+import { contextoHitos } from '@/lib/ia'
 import { useAuth } from '@/auth/AuthContext'
 import { puedeEnProyecto } from '@/auth/permisos'
 import { formatearFecha } from '@/domain/fechas'
@@ -237,6 +240,27 @@ export default function Hitos() {
 
   return (
     <div className="hg-pila">
+      {editable && (
+        <PanelIA
+          tipo="hitos"
+          titulo="Hitos de control que podrian faltar"
+          descripcion="Puntos verificables de decision o entrega, propuestos a partir de las fases y los entregables del cronograma."
+          etiquetaAceptar="Anadir al formulario"
+          contexto={() => contextoHitos(datos, resumen)}
+          onAceptar={(sug) =>
+            setEdicion({
+              ...VACIO,
+              descripcion: sug.titulo,
+              // El criterio de cumplimiento es justamente lo que hace
+              // verificable un hito, asi que la propuesta entra ahi y no en una
+              // nota suelta.
+              criterioCumplimiento: sug.detalle,
+              fechaProgramada: sug.extra?.fechaSugerida ?? null,
+            })
+          }
+        />
+      )}
+
       <div className="hg-grid hg-grid--kpi">
         <KPICard etiqueta="Hitos registrados" valor={resumen.hitos.length} acento="#6366F1" />
         <KPICard
@@ -436,38 +460,25 @@ export default function Hitos() {
               <span className="hg-campo__ayuda">
                 Vincula el hito con el cronograma; permite advertir incoherencias de fecha.
               </span>
-              <div
-                className="scroll-discreto"
-                style={{
-                  maxHeight: 170,
-                  overflowY: 'auto',
-                  border: '1px solid var(--c-border)',
-                  borderRadius: 'var(--r-base)',
-                  padding: 'var(--sp-xs)',
-                  marginTop: 4,
-                }}
-              >
-                {datos.actividades
+              <SelectorActividades
+                actividades={datos.actividades
                   .filter((a) => a.nombre?.trim())
-                  .map((a) => (
-                    <label key={a.id} className="hg-check" style={{ display: 'flex', padding: '3px 0' }}>
-                      <input
-                        type="checkbox"
-                        checked={(edicion.actividadesIds ?? []).includes(a.id)}
-                        onChange={(e) => {
-                          const s = new Set(edicion.actividadesIds ?? [])
-                          if (e.target.checked) s.add(a.id)
-                          else s.delete(a.id)
-                          setEdicion({ ...edicion, actividadesIds: [...s] })
-                        }}
-                      />
-                      <span className="hg-t-sm">
-                        <span className="hg-t-ter">{a.numero}.</span> {a.nombre}
-                        <span className="hg-t-xs hg-t-ter"> · fin {formatearFecha(a.fechaFin)}</span>
-                      </span>
-                    </label>
-                  ))}
-              </div>
+                  .map((a) => {
+                    const calc = resumen.actividades.find((x) => x.id === a.id)
+                    return {
+                      id: a.id,
+                      numero: a.numero,
+                      nombre: a.nombre,
+                      faseId: a.faseId,
+                      estado: calc?.estado ?? '',
+                      fechaFin: a.fechaFin,
+                    }
+                  })}
+                fases={resumen.porFase.map((f) => ({ faseId: f.faseId, nombre: f.nombre }))}
+                seleccion={edicion.actividadesIds ?? []}
+                onCambio={(ids) => setEdicion({ ...edicion, actividadesIds: ids })}
+                etiquetaAria="Actividades asociadas al hito"
+              />
             </div>
 
             {edicion.fechaProgramada &&

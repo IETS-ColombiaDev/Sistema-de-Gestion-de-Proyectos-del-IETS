@@ -108,6 +108,30 @@ instantáneas, compromisos no disponibles en el libro— antes de que alguien de
 
 ---
 
+## Entregar y evaluar un entregable
+
+**Si usted entrega:** en *Entregas y calidad* pulse **Registrar entrega**, ponga
+el título, elija el tipo —el tipo decide con qué lista se le va a evaluar— y
+pegue el enlace que le da el botón *Compartir* de OneDrive. Verifique que quien
+va a revisarlo tenga permiso de lectura: el sistema guarda el enlace, no una
+copia del archivo. La nota para quien evalúa es opcional y sirve para decir qué
+mirar primero o qué quedó fuera de alcance.
+
+**Si usted evalúa:** abra la entrega, ábrala en OneDrive y marque cada ítem como
+*Cumple* o *No cumple*. Tenga en cuenta tres cosas:
+
+- Dejar un ítem en blanco **no** es lo mismo que darlo por incumplido. Mientras
+  quede alguno sin revisar no se puede guardar.
+- El puntaje se calcula solo; no se escribe. Sale de los ítems que usted marcó.
+- El veredicto también se deriva: un ítem **obligatorio** incumplido devuelve la
+  entrega aunque el puntaje sea alto. Su criterio va en el comentario.
+
+Una entrega devuelta no se corrige encima: el autor registra una **versión
+nueva** y la anterior queda en el historial, que es lo que permite ver si el
+entregable mejoró.
+
+---
+
 ## Ver quién está en qué
 
 En el **Dashboard ejecutivo → Equipo** hay dos lecturas distintas y complementarias:
@@ -124,6 +148,42 @@ En el **Portafolio → Personas** se ve lo que ninguna ficha de proyecto muestra
 varios proyectos a la vez y cuánta dedicación suma entre todos. Si alguien pasa de una jornada al
 sumar sus frentes, la cifra se resalta. La dedicación es la **declarada** en cada ficha, no horas
 trabajadas: el sistema no registra tiempo ejecutado.
+
+---
+
+## El tablero general
+
+*Tablero general* reúne toda la cartera en una sola lectura. Responde la
+pregunta previa al desempeño: **qué hay, de quién es y en qué estado está**.
+Cinco secciones: el resumen con un proyecto por fila, la cartera **por líder**,
+todos los **productos**, todas las **actividades** y todas las **personas**.
+
+El Portafolio, en cambio, responde cómo va el desempeño con valor ganado. Son
+lecturas complementarias, no dos versiones de lo mismo.
+
+---
+
+## Sugerencias de IA
+
+En *Matriz de riesgos*, *Hitos* y *Portafolio* hay un panel con borde punteado y
+la etiqueta **sugerencia**. Ese borde distingue a propósito lo que propone un
+modelo de lenguaje de lo que calcula el motor del sistema.
+
+**Nada se guarda solo.** Usted revisa cada propuesta y decide cuáles entran; lo
+que acepta llega al formulario, donde usted lo completa y lo guarda a su nombre.
+Son puntos de partida para su criterio, no conclusiones.
+
+Si el panel dice que el asistente no está configurado, el sistema funciona
+igual: es una función opcional.
+
+---
+
+## Cambiar de proyecto
+
+El selector está arriba en la barra lateral, con el código del proyecto actual.
+Al cambiar se conserva la sección en la que está: si estaba viendo el cronograma
+de un proyecto, entra al cronograma del otro. Tiene buscador para carteras
+grandes.
 
 ---
 

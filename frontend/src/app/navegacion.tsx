@@ -7,6 +7,7 @@
 import type { ReactNode } from 'react'
 import type { Accion } from '@/auth/permisos'
 import {
+  IconArchivo,
   IconAuditoria,
   IconCatalogo,
   IconCronograma,
@@ -46,6 +47,7 @@ export const NAV_GLOBAL: GrupoNav[] = [
   {
     titulo: 'Institucional',
     items: [
+      { ruta: '/general', etiqueta: 'Tablero general', icono: <IconTablero />, permiso: 'portafolio.ver' },
       { ruta: '/portafolio', etiqueta: 'Portafolio', icono: <IconPortafolio />, permiso: 'portafolio.ver' },
       { ruta: '/proyectos', etiqueta: 'Proyectos', icono: <IconFicha /> },
       { ruta: '/auditoria', etiqueta: 'Auditoria del sistema', icono: <IconAuditoria />, permiso: 'auditoria.ver' },
@@ -101,6 +103,7 @@ export function navProyecto(proyectoId: string): GrupoNav[] {
       titulo: 'Medicion',
       items: [
         { ruta: `${b}/productos`, etiqueta: 'Registro de productos', icono: <IconProducto /> },
+        { ruta: `${b}/entregas`, etiqueta: 'Entregas y calidad', icono: <IconArchivo />, contador: 'entregas' },
         { ruta: `${b}/satisfaccion`, etiqueta: 'Satisfaccion', icono: <IconSatisfaccion /> },
         { ruta: `${b}/presupuesto`, etiqueta: 'Control presupuestal', icono: <IconPresupuesto /> },
       ],

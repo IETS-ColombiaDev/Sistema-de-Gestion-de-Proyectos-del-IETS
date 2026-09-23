@@ -136,6 +136,11 @@ convertir avance y ejecución en un veredicto. No sustituye ninguna épica; se a
 | Gráficos de decisión | `components/charts/avanzados.tsx` | Curva S, cascada, cuadrante, barras divergentes, Pareto, bullet, sparkline |
 | Gráficos de reparto | `components/charts/reparto.tsx` | Dona, barras agrupadas, linea de hitos, carga por persona, matriz persona x fase |
 | Personas del portafolio | `modules/portafolio/Portafolio.tsx` (pestana *Personas*) | Consolida a cada persona entre proyectos: donde participa, dedicacion sumada y trabajo retrasado |
+| Tablero general | `modules/general/DashboardGeneral.tsx` | Toda la cartera desagregada por lider, proyecto, producto, actividad y persona |
+| Entregas y calidad | `modules/entregas/Entregas.tsx` + `domain/entregas.ts` | Enlace al repositorio institucional, lista de chequeo por tipo, puntaje calculado y versiones |
+| Asistente de IA | `functions/src/index.ts` (`sugerirConIA`) + `lib/ia.ts` + `components/PanelIA.tsx` | Sugerencias de riesgos, hitos y lectura de cartera. La clave vive en el gestor de secretos; nada se escribe sin aceptacion humana |
+| Selector de proyecto | `components/SelectorProyecto.tsx` | Cambio de proyecto conservando la seccion actual |
+| Selector de actividades | `components/SelectorActividades.tsx` | Agrupado por fase, con busqueda y estado |
 | Barra de filtros | `components/FiltroBarra.tsx` | Una fila que acota el tablero entero, con estado en la URL para compartir la vista. Presente en los cinco tableros |
 | Medida del lienzo | `lib/useLienzo.ts` | Los graficos se dibujan a escala 1:1 sobre el contenedor medido; la altura sale de un token compartido y no del ancho de la tarjeta |
 

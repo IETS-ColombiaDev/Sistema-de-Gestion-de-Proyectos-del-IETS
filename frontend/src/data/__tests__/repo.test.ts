@@ -451,7 +451,7 @@ describe('catalogos', () => {
     expect(estadoActividad?.valores.map((v) => v.valor)).toEqual([
       'Pendiente',
       'En curso',
-      'Completada',
+      'Completa',
       'Retrasada',
     ])
   })

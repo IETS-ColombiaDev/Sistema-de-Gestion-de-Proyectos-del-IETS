@@ -1613,3 +1613,336 @@
   border-radius: 50%;
   background: var(--c-danger, #DC2626);
 }
+
+/* ------------------------------------------------ Lista de chequeo
+   Una fila por item: el enunciado a la izquierda y el par cumple / no cumple a
+   la derecha. Los dos botones tienen 34px de alto porque se pulsan muchas
+   veces seguidas y en tactil. */
+.hg-chequeo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-md);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-base);
+  background: var(--c-bg-card);
+}
+.hg-chequeo__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.hg-chequeo__opciones {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.hg-chequeo__boton {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-base);
+  background: var(--c-bg-card);
+  color: var(--c-text-2);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.hg-chequeo__boton:hover:not(:disabled) {
+  background: var(--c-bg-hover);
+}
+.hg-chequeo__boton:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.hg-chequeo__boton:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+/* El estado marcado se reconoce por color Y por el borde reforzado: el color
+   solo no basta para quien no lo distingue. */
+.hg-chequeo__boton--si {
+  background: #D1FAE5;
+  border-color: #047857;
+  border-width: 2px;
+  color: #065F46;
+}
+.hg-chequeo__boton--no {
+  background: #FEE2E2;
+  border-color: #B91C1C;
+  border-width: 2px;
+  color: #991B1B;
+}
+
+@media (max-width: 640px) {
+  .hg-chequeo {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hg-chequeo__opciones {
+    justify-content: stretch;
+  }
+  .hg-chequeo__boton {
+    flex: 1;
+  }
+}
+
+/* ------------------------------------------------------- Panel de IA
+   Se distingue del resto de la interfaz a proposito: lo que hay dentro es una
+   propuesta, no una cifra del motor de calculo, y el lector tiene que poder
+   notar la diferencia sin leer la letra pequena. */
+.hg-ia {
+  border: 1px dashed var(--c-primary, #6366F1);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.04), transparent 60%);
+  padding: var(--sp-md) var(--sp-lg);
+}
+.hg-ia__cabecera {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+}
+.hg-ia__marca {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-base);
+  background: #E0E7FF;
+  color: #4338CA;
+  flex: none;
+}
+.hg-ia__aviso {
+  margin: var(--sp-sm) 0 0;
+}
+.hg-ia__lista {
+  list-style: none;
+  margin: var(--sp-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hg-ia__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-md);
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-base);
+}
+.hg-ia__pie {
+  margin: var(--sp-sm) 0 0;
+}
+
+@media (max-width: 640px) {
+  .hg-ia__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* --------------------------------------------- Selector de actividades
+   Agrupado por fase y con busqueda: una lista plana de treinta casillas obliga
+   a leerlas todas para encontrar una. */
+.hg-selact {
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-base);
+  overflow: hidden;
+}
+.hg-selact__barra {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: var(--sp-xs) var(--sp-sm);
+  background: var(--c-bg-hover);
+  border-bottom: 1px solid var(--c-border);
+  flex-wrap: wrap;
+}
+.hg-selact__barra .hg-campo {
+  flex: 1;
+  min-width: 150px;
+}
+.hg-selact__conteo {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.hg-selact__lista {
+  max-height: 280px;
+  overflow-y: auto;
+}
+/* La cabecera de fase se queda fija al desplazar: sin ella se pierde de vista
+   a que fase pertenece lo que se esta leyendo. */
+.hg-selact__fase {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 5px var(--sp-sm);
+  background: var(--c-bg-card);
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--c-text-3);
+}
+.hg-selact__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  /* 36px de alto: se marcan varias seguidas y muchas veces en tactil. */
+  min-height: 36px;
+  padding: 4px var(--sp-sm);
+  cursor: pointer;
+  border-bottom: 1px solid var(--c-border-suave, #F1F5F9);
+}
+.hg-selact__item:hover {
+  background: var(--c-bg-hover);
+}
+.hg-selact__item--on {
+  background: var(--c-primary-suave, #EEF2FF);
+}
+.hg-selact__item:focus-within {
+  outline: 2px solid var(--c-primary);
+  outline-offset: -2px;
+}
+.hg-selact__texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.hg-selact__texto > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ Selector de proyecto
+   Vive en la barra lateral, bajo la marca: el proyecto en el que se esta
+   trabajando es la pieza de contexto mas importante de la pantalla, y hasta
+   ahora habia que ir al listado para cambiarlo. */
+.hg-selproy {
+  position: relative;
+  padding: 0 var(--sp-md) var(--sp-sm);
+}
+.hg-selproy__boton {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  width: 100%;
+  min-height: 46px;
+  padding: 6px var(--sp-sm);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-base);
+  background: var(--c-bg-card);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.hg-selproy__boton:hover {
+  border-color: var(--c-primary);
+  background: var(--c-bg-hover);
+}
+.hg-selproy__boton:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+.hg-selproy__actual {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.hg-selproy__codigo {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hg-selproy__nombre {
+  font-size: var(--fs-xs);
+  color: var(--c-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg-selproy__menu {
+  position: absolute;
+  z-index: 40;
+  left: var(--sp-md);
+  right: var(--sp-md);
+  margin-top: 4px;
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-lg, 0 12px 32px rgba(15, 23, 42, 0.16));
+  overflow: hidden;
+}
+.hg-selproy__buscar {
+  padding: var(--sp-xs);
+  border-bottom: 1px solid var(--c-border);
+}
+.hg-selproy__lista {
+  max-height: 260px;
+  overflow-y: auto;
+}
+.hg-selproy__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  width: 100%;
+  min-height: 44px;
+  padding: 6px var(--sp-sm);
+  border: 0;
+  border-bottom: 1px solid var(--c-border-suave, #F1F5F9);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hg-selproy__item:hover {
+  background: var(--c-bg-hover);
+}
+.hg-selproy__item--on {
+  background: var(--c-primary-suave, #EEF2FF);
+}
+.hg-selproy__item:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: -2px;
+}
+.hg-selproy__texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.hg-selproy__texto > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hg-selproy__pie {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  background: var(--c-bg-hover);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-primary);
+  cursor: pointer;
+}
+.hg-selproy__pie:hover {
+  text-decoration: underline;
+}

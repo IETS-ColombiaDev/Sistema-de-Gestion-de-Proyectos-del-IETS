@@ -280,7 +280,7 @@ export default function DashboardEjecutivo() {
               ? `${retrasadas} actividad(es) retrasada(s)`
               : undefined,
           segmentos: [
-            { etiqueta: 'Completada', valor: porEstado('Completada'), color: estadoColors.actividad.Completada.bar },
+            { etiqueta: 'Completa', valor: porEstado('Completa'), color: estadoColors.actividad.Completa.bar },
             { etiqueta: 'En curso', valor: porEstado('En curso'), color: estadoColors.actividad['En curso'].bar },
             { etiqueta: 'Pendiente', valor: porEstado('Pendiente'), color: estadoColors.actividad.Pendiente.bar },
             { etiqueta: 'Retrasada', valor: retrasadas, color: estadoColors.actividad.Retrasada.bar },
@@ -1021,7 +1021,7 @@ export default function DashboardEjecutivo() {
             <KPICard
               etiqueta="Integrantes"
               valor={resumen.equipo.total}
-              pie={`${resumen.equipo.contratados} contratado(s)`}
+              pie={`${resumen.equipo.planta} de planta · ${resumen.equipo.contratistas} contratista(s)`}
               acento={colorSerie(0)}
             />
             <KPICard
@@ -1090,17 +1090,19 @@ export default function DashboardEjecutivo() {
                   {
                     clave: 'vinculacion',
                     titulo: 'Vinculacion',
-                    render: (m) => <BadgeEstado familia="recurso" valor={m.vinculacion} />,
+                    render: (m) => <BadgeEstado familia="vinculacion" valor={m.vinculacion} />,
                   },
                   {
                     clave: 'dedicacion',
                     titulo: 'Dedicacion',
                     alineacion: 'derecha',
+                    pista: 'Horas al mes declaradas en la ficha del equipo. Es compromiso planeado, no horas trabajadas: el sistema no registra tiempo ejecutado.',
                     render: (m) => `${m.dedicacion} h/mes`,
                   },
                   {
                     clave: 'enQue',
                     titulo: 'En que esta',
+                    pista: 'La actividad en curso de esa persona. Si no tiene ninguna en curso se muestra la retrasada; si no tiene ninguna de las dos, se dice que no tiene trabajo en marcha.',
                     render: (m) =>
                       m.enQue == null ? (
                         <span className="hg-t-xs hg-t-ter">Sin actividad en marcha</span>
@@ -1192,7 +1194,7 @@ export default function DashboardEjecutivo() {
             subtitulo="Actividades donde figura como responsable, desagregadas por estado."
           >
             <Figura
-              leyenda={(['Completada', 'En curso', 'Pendiente', 'Retrasada'] as const).map((e) => ({
+              leyenda={(['Completa', 'En curso', 'Pendiente', 'Retrasada'] as const).map((e) => ({
                 etiqueta: e,
                 color: estadoColors.actividad[e].bar,
               }))}
@@ -1208,7 +1210,7 @@ export default function DashboardEjecutivo() {
                       alineacion: 'derecha',
                       render: (p) => p.segmentos.reduce((s, x) => s + x.valor, 0),
                     },
-                    ...(['Completada', 'En curso', 'Pendiente', 'Retrasada'] as const).map((e) => ({
+                    ...(['Completa', 'En curso', 'Pendiente', 'Retrasada'] as const).map((e) => ({
                       clave: e,
                       titulo: e,
                       alineacion: 'derecha' as const,
@@ -1230,7 +1232,7 @@ export default function DashboardEjecutivo() {
           </Card>
 
           <div className="hg-grid hg-grid--2">
-            <Card titulo="Estado de vinculacion" subtitulo="Situacion contractual del grupo desarrollador.">
+            <Card titulo="Tipo de vinculacion" subtitulo="Como esta vinculado al instituto el grupo desarrollador.">
               <Figura
                 tabla={
                   <Table

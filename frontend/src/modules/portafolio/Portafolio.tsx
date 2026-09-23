@@ -47,6 +47,8 @@ import { usePortafolio, type FilaPortafolio } from '@/app/usePortafolio'
 import { formatearFecha } from '@/domain/fechas'
 import { iniciales, conSigno, moneda, monedaCorta, porcentaje } from '@/lib/formato'
 import { exportarExcel } from '@/lib/exportar'
+import PanelIA from '@/components/PanelIA'
+import { contextoPortafolio } from '@/lib/ia'
 import { useAuth } from '@/auth/AuthContext'
 import { puede } from '@/auth/permisos'
 import { ESTADOS_PROYECTO } from '@/domain/types'
@@ -680,6 +682,25 @@ export default function Portafolio() {
         />
       )}
 
+      <PanelIA
+        tipo="portafolio"
+        titulo="Lectura de la cartera"
+        descripcion="Puntos que requieren decision de la direccion, leidos sobre los indices consolidados de los proyectos visibles."
+        contexto={() =>
+          contextoPortafolio(
+            visibles.map((f) => ({
+              codigo: f.proyecto.codigo,
+              nombre: f.proyecto.nombre,
+              avance: f.resumen.avancePonderado,
+              indiceCronograma: f.analisis.evm.indiceCronograma,
+              indiceCosto: f.analisis.evm.indiceCosto,
+              variacionAlCierre: f.analisis.evm.variacionAlCierre,
+              alertasCriticas: f.alertasCriticas,
+            })),
+          )
+        }
+      />
+
       <Tabs
         opciones={[
           { valor: 'desempeno', etiqueta: 'Desempeno' },
@@ -1196,6 +1217,7 @@ export default function Portafolio() {
                     titulo: 'Dedicacion',
                     alineacion: 'derecha',
                     ordenable: true,
+                    pista: 'Suma de la dedicacion declarada en todos los proyectos de esa persona. Por encima de una jornada se resalta.',
                     valorOrden: (p) => p.dedicacion,
                     render: (p) => (
                       <span

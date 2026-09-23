@@ -305,3 +305,40 @@ Reglas de presentación que el motor impone y la interfaz no puede saltarse:
   positivo siempre significando *encarece*. Hay una prueba que lo verifica como identidad exacta.
 - **El costo no se reparte por fase.** El desglose por fase muestra índice de cronograma y declara
   por qué no muestra índice de costo: el libro se lleva por rubro y periodo, no por fase.
+
+
+---
+
+## Evaluación de entregas
+
+`domain/entregas.ts` — probadas en `domain/__tests__/entregas.test.ts`.
+
+El miembro del equipo registra el enlace de su entregable; el líder lo evalúa
+contra una lista de chequeo propia del tipo de entrega. Las reglas:
+
+| Regla | Qué impone |
+|---|---|
+| **El archivo no se copia** | Se guarda el enlace al repositorio institucional (OneDrive / SharePoint). Copiarlo crearía una segunda versión de la verdad y un problema de custodia que el sistema no puede resolver |
+| **Solo enlaces institucionales** | Se aceptan dominios de SharePoint y OneDrive, y solo por `https`. Un enlace a una unidad personal cualquiera dejaría el entregable fuera del control de permisos, versiones y retención de la entidad |
+| **La lista depende del tipo** | A una encuesta se le revisan cosas distintas que a un informe. Una sola lista para todo obligaría a marcar "no aplica" en la mitad de los ítems, que es como no evaluar |
+| **Un ítem sin revisar no es un incumplimiento** | El puntaje se calcula sobre los ítems ya revisados; la evaluación se declara incompleta hasta que no quede ninguno en blanco, y no se puede guardar así |
+| **El puntaje se calcula (ADR-03)** | No existe ruta para teclearlo. Una calificación que se escribe a mano deja de medir la lista de chequeo |
+| **El veredicto se deriva** | Un obligatorio incumplido devuelve la entrega aunque el puntaje sea alto; por debajo del umbral de 80 también. El comentario es donde va el criterio del líder; el veredicto lo fija la evidencia |
+| **El autor no se evalúa a sí mismo** | La matriz de permisos separa `entregas.registrar` de `entregas.evaluar`. Si el autor pudiera aprobar su propio trabajo, la lista sería un formalismo |
+| **Una entrega devuelta no se edita** | Se registra una versión nueva y la anterior queda en el historial. Reescribirla borraría la evidencia de si el entregable mejoró tras la observación |
+| **Solo la última versión cuenta** | Una entrega devuelta y vuelta a entregar es un problema atendido, no dos. Los totales usan la versión vigente; el historial sigue disponible |
+
+Las listas de chequeo viven en el catálogo (ADR-07): el administrador las edita
+sin desplegar.
+
+---
+
+## Vocabulario corregido
+
+Dos listas controladas cambiaron porque describían otra cosa que la que el
+proyecto necesita saber:
+
+| Antes | Ahora | Por qué |
+|---|---|---|
+| Estado de actividad **"Completada"** | **"Completa"** | Concordancia con el sustantivo del sistema |
+| Vinculación: *Contactado · Confirmado · Contratado · No disponible* | **Planta · Contratista · Por definir** | La lista anterior describía la *etapa del trámite de contratación*, que es una pregunta de gestión humana. Lo que el proyecto necesita saber es **de qué tipo es el vínculo**, porque determina disponibilidad, costo y a quién se le puede asignar responsabilidad formal. "Por definir" no es un tipo de vínculo sino su ausencia, y acompaña a los perfiles aún sin persona designada |

@@ -14,6 +14,7 @@ import { CATALOGO_INDICADORES, calcularIndicadores } from '@/domain/indicadores'
 import { resumirProyecto } from '@/domain/reglas'
 import { diffDias, hoyISO, sumarDias, sumarMeses } from '@/domain/fechas'
 import type {
+  Entrega,
   Actividad,
   AsignacionRaci,
   DatosProyecto,
@@ -218,7 +219,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     entidadEjecutora: 'Instituto de Evaluacion Tecnologica en Salud',
     financiador: 'Entidad contratante de referencia',
     liderUid: 'u-lider',
-    liderNombre: 'Lider de proyecto',
+    liderNombre: 'Marcela Ortiz',
     fechaInicio: inicio,
     fechaEntregaFinal: fin,
     fechaCorte: hoy,
@@ -248,13 +249,13 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   // no se distinguen entre si. El perfil se conserva como dato aparte y se
   // muestra junto al nombre.
   const equipo: MiembroEquipo[] = [
-    { perfil: 'Lider de proyecto', nombre: 'Marcela Ortiz', usuarioUid: 'u-lider', dedicacionHorasMes: 60, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 95_000 },
-    { perfil: 'Gestor de proyecto', nombre: 'Daniel Pineda', usuarioUid: 'u-gestor', dedicacionHorasMes: 120, mesesVinculacion: 13, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 62_000 },
-    { perfil: 'Analista de evaluacion', nombre: 'Juliana Bermudez', usuarioUid: 'u-miembro', dedicacionHorasMes: 160, mesesVinculacion: 11, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 54_000 },
-    { perfil: 'Metodologa', nombre: 'Carolina Vargas', usuarioUid: null, dedicacionHorasMes: 80, mesesVinculacion: 9, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 78_000 },
-    { perfil: 'Economista de la salud', nombre: 'Andres Quintero', usuarioUid: null, dedicacionHorasMes: 100, mesesVinculacion: 7, estadoVinculacion: 'Confirmado', porDesignar: false, costoHora: 82_000 },
-    { perfil: 'Especialista en informacion', nombre: 'Paola Serrano', usuarioUid: null, dedicacionHorasMes: 40, mesesVinculacion: 4, estadoVinculacion: 'Contratado', porDesignar: false, costoHora: 48_000 },
-    { perfil: 'Analista junior', nombre: 'Sebastian Lozano', usuarioUid: null, dedicacionHorasMes: 160, mesesVinculacion: 6, estadoVinculacion: 'Contactado', porDesignar: false, costoHora: 32_000 },
+    { perfil: 'Lider de proyecto', nombre: 'Marcela Ortiz', usuarioUid: 'u-lider', dedicacionHorasMes: 60, mesesVinculacion: 13, estadoVinculacion: 'Planta', porDesignar: false, costoHora: 95_000 },
+    { perfil: 'Gestor de proyecto', nombre: 'Daniel Pineda', usuarioUid: 'u-gestor', dedicacionHorasMes: 120, mesesVinculacion: 13, estadoVinculacion: 'Planta', porDesignar: false, costoHora: 62_000 },
+    { perfil: 'Analista de evaluacion', nombre: 'Juliana Bermudez', usuarioUid: 'u-miembro', dedicacionHorasMes: 160, mesesVinculacion: 11, estadoVinculacion: 'Planta', porDesignar: false, costoHora: 54_000 },
+    { perfil: 'Metodologa', nombre: 'Carolina Vargas', usuarioUid: null, dedicacionHorasMes: 80, mesesVinculacion: 9, estadoVinculacion: 'Contratista', porDesignar: false, costoHora: 78_000 },
+    { perfil: 'Economista de la salud', nombre: 'Andres Quintero', usuarioUid: null, dedicacionHorasMes: 100, mesesVinculacion: 7, estadoVinculacion: 'Contratista', porDesignar: false, costoHora: 82_000 },
+    { perfil: 'Especialista en informacion', nombre: 'Paola Serrano', usuarioUid: null, dedicacionHorasMes: 40, mesesVinculacion: 4, estadoVinculacion: 'Contratista', porDesignar: false, costoHora: 48_000 },
+    { perfil: 'Analista junior', nombre: 'Sebastian Lozano', usuarioUid: null, dedicacionHorasMes: 160, mesesVinculacion: 6, estadoVinculacion: 'Contratista', porDesignar: false, costoHora: 32_000 },
     // La editora queda sin tarifa a proposito: el tablero debe declarar que el
     // costo teorico del equipo esta incompleto, no fingir que no lo esta.
     { perfil: 'Editora', nombre: '', usuarioUid: null, dedicacionHorasMes: 30, mesesVinculacion: 3, estadoVinculacion: 'Por definir', porDesignar: true },
@@ -501,6 +502,112 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
   })) as RegistroPresupuestal[]
   await ad.guardarLote(rutas.presupuesto(proyectoId), presupuesto as unknown as DocumentoBase[])
 
+  // --- Entregas y evaluaciones ---
+  // Cubren los tres desenlaces posibles para que el tablero se pueda leer sin
+  // tener que producir datos a mano: una aprobada, una devuelta que ya tiene
+  // version nueva aprobada con observaciones, y una sin evaluar todavia.
+  const entregas: Entrega[] = [
+    {
+      id: 'ent1',
+      proyectoId,
+      actividadId: 'act005',
+      productoId: null,
+      tipo: 'Informe',
+      titulo: 'Protocolo de evaluacion',
+      enlace: 'https://iets-my.sharepoint.com/:w:/g/documentos/protocolo-evaluacion',
+      entregadoPor: idPorPerfil.get('Analista de evaluacion') ?? '',
+      entregadoPorNombre: nombrePorPerfil.get('Analista de evaluacion') ?? '',
+      fechaEntrega: sumarDias(hoy, -48),
+      version: 1,
+      reemplazaA: null,
+      estado: 'Aprobada',
+      evaluacion: {
+        evaluadaPor: 'u-lider',
+        evaluadaPorNombre: nombrePorPerfil.get('Lider de proyecto') ?? '',
+        evaluadaEn: `${sumarDias(hoy, -45)}T15:30:00.000Z`,
+        listaId: 'chk2',
+        resultados: [],
+        puntaje: 100,
+        veredicto: 'Aprobada',
+        comentario: 'Metodologia clara y limitaciones declaradas.',
+      },
+      ...meta('u-miembro'),
+    },
+    {
+      id: 'ent2',
+      proyectoId,
+      actividadId: 'act011',
+      productoId: null,
+      tipo: 'Base de datos',
+      titulo: 'Tablas de evidencia',
+      enlace: 'https://iets-my.sharepoint.com/:x:/g/documentos/tablas-evidencia-v1',
+      entregadoPor: idPorPerfil.get('Metodologa') ?? '',
+      entregadoPorNombre: nombrePorPerfil.get('Metodologa') ?? '',
+      fechaEntrega: sumarDias(hoy, -22),
+      version: 1,
+      reemplazaA: null,
+      estado: 'Devuelta',
+      evaluacion: {
+        evaluadaPor: 'u-lider',
+        evaluadaPorNombre: nombrePorPerfil.get('Lider de proyecto') ?? '',
+        evaluadaEn: `${sumarDias(hoy, -20)}T09:10:00.000Z`,
+        listaId: 'chk4',
+        resultados: [],
+        puntaje: 60,
+        veredicto: 'Devuelta',
+        comentario: 'Falta el diccionario de variables y hay valores faltantes sin codificar.',
+      },
+      ...meta('u-miembro'),
+    },
+    {
+      id: 'ent3',
+      proyectoId,
+      actividadId: 'act011',
+      productoId: null,
+      tipo: 'Base de datos',
+      titulo: 'Tablas de evidencia',
+      enlace: 'https://iets-my.sharepoint.com/:x:/g/documentos/tablas-evidencia-v2',
+      entregadoPor: idPorPerfil.get('Metodologa') ?? '',
+      entregadoPorNombre: nombrePorPerfil.get('Metodologa') ?? '',
+      fechaEntrega: sumarDias(hoy, -12),
+      version: 2,
+      reemplazaA: 'ent2',
+      estado: 'Aprobada con observaciones',
+      notaDelAutor: 'Se agrego el diccionario y se codificaron los faltantes como NA.',
+      evaluacion: {
+        evaluadaPor: 'u-lider',
+        evaluadaPorNombre: nombrePorPerfil.get('Lider de proyecto') ?? '',
+        evaluadaEn: `${sumarDias(hoy, -10)}T11:00:00.000Z`,
+        listaId: 'chk4',
+        resultados: [],
+        puntaje: 83,
+        veredicto: 'Aprobada con observaciones',
+        comentario: 'Diccionario incorporado. Queda pendiente declarar la fecha de corte de la fuente.',
+      },
+      ...meta('u-miembro'),
+    },
+    {
+      id: 'ent4',
+      proyectoId,
+      actividadId: 'act016',
+      productoId: null,
+      tipo: 'Entregable',
+      titulo: 'Informe preliminar — borrador para revision',
+      enlace: 'https://iets-my.sharepoint.com/:w:/g/documentos/informe-preliminar-borrador',
+      entregadoPor: idPorPerfil.get('Analista de evaluacion') ?? '',
+      entregadoPorNombre: nombrePorPerfil.get('Analista de evaluacion') ?? '',
+      fechaEntrega: sumarDias(hoy, -3),
+      version: 1,
+      reemplazaA: null,
+      estado: 'Entregada',
+      notaDelAutor: 'Falta el capitulo economico, que depende del modelo en curso.',
+      evaluacion: null,
+      ...meta('u-miembro'),
+    },
+  ]
+  await ad.guardarLote(rutas.entregas(proyectoId), entregas as unknown as DocumentoBase[])
+
+
   // -------------------------------------------------------------------------
   // Instantaneas historicas
   // -------------------------------------------------------------------------
@@ -569,6 +676,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
       equipo,
       actividades,
       hitos,
+      entregas: [],
       raci,
       riesgos,
       recursos,
@@ -615,12 +723,15 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
      * ve holgado por separado y la persona esta saturada al sumarlos.
      */
     integrantes: { perfil: string; dedicacionHorasMes: number; compartido?: boolean }[]
+    /** Quien responde por el proyecto. */
+    lider: string
   }
 
   const perfiles: PerfilProyecto[] = [
     {
       id: 'pry-guia',
       codigo: 'GPC-2026-002',
+      lider: 'Carolina Vargas',
       nombre: 'Guia de practica clinica — condicion de referencia',
       tecnologiaObjeto: 'Guia de practica clinica basada en evidencia',
       alcance:
@@ -644,6 +755,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     {
       id: 'pry-consulta',
       codigo: 'CON-2026-003',
+      lider: 'Marcela Ortiz',
       nombre: 'Consulta ciudadana sobre priorizacion en salud',
       tecnologiaObjeto: 'Instrumento de consulta y analisis de preferencias',
       alcance:
@@ -666,6 +778,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
     {
       id: 'pry-registro',
       codigo: 'REG-2025-004',
+      lider: 'Daniel Pineda',
       nombre: 'Registro nacional de tecnologias evaluadas',
       tecnologiaObjeto: 'Plataforma de registro y consulta publica',
       alcance:
@@ -699,6 +812,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
       ...meta('u-lider'),
       codigo: perfil.codigo,
       nombre: perfil.nombre,
+      liderNombre: perfil.lider,
       tecnologiaObjeto: perfil.tecnologiaObjeto,
       alcance: perfil.alcance,
       objetivoGeneral: perfil.alcance,
@@ -743,7 +857,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
         usuarioUid: compartido ? referencia!.usuarioUid : null,
         dedicacionHorasMes: it.dedicacionHorasMes,
         mesesVinculacion: perfil.mesesTranscurridos,
-        estadoVinculacion: 'Contratado',
+        estadoVinculacion: 'Contratista',
         costoHora: compartido ? referencia!.costoHora : undefined,
       } as MiembroEquipo
     })
@@ -793,6 +907,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
         productos: [],
         satisfaccion: [],
         presupuesto: [],
+        entregas: [],
       },
       PARAMETROS_POR_DEFECTO,
     )
@@ -839,6 +954,7 @@ export async function sembrarDatos(forzar = false): Promise<ResultadoSiembra | n
         productos: [],
         satisfaccion: [],
         presupuesto: presupuestoP,
+        entregas: [],
       },
       cortesPasados.slice(-Math.min(cortesPasados.length, perfil.mesesTranscurridos)),
     )

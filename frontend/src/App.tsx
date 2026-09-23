@@ -12,6 +12,7 @@ import { backendSolicitado } from '@/data/backend'
 import Login from '@/modules/Login'
 
 const Portafolio = lazy(() => import('@/modules/portafolio/Portafolio'))
+const DashboardGeneral = lazy(() => import('@/modules/general/DashboardGeneral'))
 const ListaProyectos = lazy(() => import('@/modules/proyectos/ListaProyectos'))
 const Ficha = lazy(() => import('@/modules/proyectos/Ficha'))
 const Equipo = lazy(() => import('@/modules/equipo/Equipo'))
@@ -22,6 +23,7 @@ const Raci = lazy(() => import('@/modules/raci/Raci'))
 const Riesgos = lazy(() => import('@/modules/riesgos/Riesgos'))
 const Recursos = lazy(() => import('@/modules/recursos/Recursos'))
 const Productos = lazy(() => import('@/modules/productos/Productos'))
+const Entregas = lazy(() => import('@/modules/entregas/Entregas'))
 const Satisfaccion = lazy(() => import('@/modules/satisfaccion/Satisfaccion'))
 const Presupuesto = lazy(() => import('@/modules/presupuesto/Presupuesto'))
 const Indicadores = lazy(() => import('@/modules/indicadores/Indicadores'))
@@ -55,6 +57,7 @@ function Rutas() {
             </RutaPrivada>
           }
         >
+          <Route path="/general" element={<DashboardGeneral />} />
           <Route path="/portafolio" element={<Portafolio />} />
           <Route path="/proyectos" element={<ListaProyectos />} />
           <Route path="/auditoria" element={<AuditoriaGlobal />} />
@@ -85,6 +88,7 @@ function Rutas() {
           <Route path="riesgos" element={<Riesgos />} />
           <Route path="recursos" element={<Recursos />} />
           <Route path="productos" element={<Productos />} />
+          <Route path="entregas" element={<Entregas />} />
           <Route path="satisfaccion" element={<Satisfaccion />} />
           <Route path="presupuesto" element={<Presupuesto />} />
           <Route path="indicadores" element={<Indicadores />} />

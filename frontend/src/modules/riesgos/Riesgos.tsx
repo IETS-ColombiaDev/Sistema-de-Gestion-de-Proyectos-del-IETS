@@ -19,6 +19,8 @@ import { useToast } from '@/components/Toast'
 import { Figura, MapaCalor } from '@/components/charts'
 import { IconEditar, IconEliminar, IconExportar, IconMas, IconRiesgo } from '@/components/icons'
 import { useProyecto } from '@/app/ProyectoContext'
+import PanelIA from '@/components/PanelIA'
+import { contextoRiesgos } from '@/lib/ia'
 import { useAuth } from '@/auth/AuthContext'
 import { puedeEnProyecto } from '@/auth/permisos'
 import { mapaCalorRiesgos, nivelRiesgo, severidadRiesgo, validarRiesgo } from '@/domain/reglas'
@@ -254,6 +256,29 @@ export default function Riesgos() {
 
   return (
     <div className="hg-pila">
+      {editable && (
+        <PanelIA
+          tipo="riesgos"
+          titulo="Riesgos que este proyecto podria enfrentar"
+          descripcion="Propuestas a partir del alcance, las fases y el avance del proyecto, descartando los que ya estan registrados."
+          etiquetaAceptar="Anadir al formulario"
+          contexto={() => contextoRiesgos(datos, resumen)}
+          onAceptar={(sug) =>
+            setEdicion({
+              ...VACIO,
+              descripcion: sug.titulo,
+              // El detalle del modelo entra como observacion, no como plan de
+              // respuesta: el plan lo decide quien responde por el riesgo.
+              observaciones: sug.detalle,
+              categoria: (sug.extra?.categoria as Riesgo['categoria']) ?? categorias[0] ?? '',
+              probabilidad: Number(sug.extra?.probabilidad) || null,
+              impacto: Number(sug.extra?.impacto) || null,
+              planRespuesta: sug.extra?.mitigacion ?? '',
+            })
+          }
+        />
+      )}
+
       {criticos.length > 0 && (
         <Alert
           tipo="error"

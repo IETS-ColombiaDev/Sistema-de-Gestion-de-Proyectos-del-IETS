@@ -134,7 +134,7 @@ export const estadoColors = {
   actividad: {
     Pendiente: { fg: '#64748B', bg: '#F1F5F9', bar: '#94A3B8' },
     'En curso': { fg: '#1D4ED8', bg: '#DBEAFE', bar: '#3B82F6' },
-    Completada: { fg: '#047857', bg: '#D1FAE5', bar: '#10B981' },
+    Completa: { fg: '#047857', bg: '#D1FAE5', bar: '#10B981' },
     Retrasada: { fg: '#B91C1C', bg: '#FEE2E2', bar: '#EF4444' },
   },
   hito: {
@@ -155,6 +155,28 @@ export const estadoColors = {
     'Atencion': { fg: '#92400E', bg: '#FEF3C7' },
     'Critico': { fg: '#B91C1C', bg: '#FEE2E2' },
     'Sin datos': { fg: '#64748B', bg: '#F1F5F9' },
+  },
+  /**
+   * Tipo de vinculacion. Es una clasificacion, no un semaforo: ni planta ni
+   * contratista es "mejor", asi que los dos tonos son neutros de identidad y
+   * no del semaforo institucional. "Por definir" si advierte, porque es la
+   * ausencia de vinculo.
+   */
+  /**
+   * Estado de una entrega. Aqui el semaforo SI corresponde: aprobada, con
+   * observaciones y devuelta son grados de un mismo juicio de calidad.
+   */
+  entrega: {
+    Entregada: { fg: '#1D4ED8', bg: '#DBEAFE' },
+    'En evaluacion': { fg: '#0E7490', bg: '#CFFAFE' },
+    Aprobada: { fg: '#047857', bg: '#D1FAE5' },
+    'Aprobada con observaciones': { fg: '#92400E', bg: '#FEF3C7' },
+    Devuelta: { fg: '#B91C1C', bg: '#FEE2E2' },
+  },
+  vinculacion: {
+    Planta: { fg: '#3730A3', bg: '#E0E7FF' },
+    Contratista: { fg: '#0E7490', bg: '#CFFAFE' },
+    'Por definir': { fg: '#92400E', bg: '#FEF3C7' },
   },
   recurso: {
     'Por gestionar': { fg: '#92400E', bg: '#FEF3C7' },

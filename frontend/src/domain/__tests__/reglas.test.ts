@@ -47,12 +47,12 @@ const ctx = (modo: 'saneado' | 'compatibilidad' = 'saneado', corte = '2026-06-30
 
 // ---------------------------------------------------------------------------
 describe('RN-01 · estado de la actividad', () => {
-  it('marca Completada cuando el avance llega a 100, incluso si la fecha fin paso', () => {
+  it('marca Completa cuando el avance llega a 100, incluso si la fecha fin paso', () => {
     const r = estadoActividad(
       { nombre: 'A', fechaInicio: '2026-01-01', fechaFin: '2026-02-01', avance: 100 },
       '2026-06-30',
     )
-    expect(r.estado).toBe('Completada')
+    expect(r.estado).toBe('Completa')
   })
 
   it('marca Retrasada cuando el corte supera la fecha fin sin llegar a 100', () => {
@@ -507,14 +507,16 @@ describe('RN-18 / RN-19 · recursos y equipo (D-09)', () => {
     expect(r.total).toBe(4) // excluye la baja logica
   })
 
-  it('suma la dedicacion del equipo en horas/mes', () => {
+  it('suma la dedicacion del equipo en horas/mes y separa el tipo de vinculo', () => {
     const e = resumenEquipo([
-      b.miembro({ dedicacionHorasMes: 80, estadoVinculacion: 'Contratado' }),
+      b.miembro({ dedicacionHorasMes: 80, estadoVinculacion: 'Planta' }),
+      b.miembro({ dedicacionHorasMes: 60, estadoVinculacion: 'Contratista' }),
       b.miembro({ dedicacionHorasMes: 40, estadoVinculacion: 'Por definir' }),
     ])
-    expect(e.dedicacionTotalHorasMes).toBe(120)
+    expect(e.dedicacionTotalHorasMes).toBe(180)
     expect(e.porDefinir).toBe(1)
-    expect(e.contratados).toBe(1)
+    expect(e.planta).toBe(1)
+    expect(e.contratistas).toBe(1)
   })
 })
 
